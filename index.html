@@ -271,7 +271,6 @@
                     updateStepVisuals(row, col);
                 }
             }
-            // Set width for top scroller content
             dom.topScrollerContent.style.width = dom.gridContainer.scrollWidth + 'px';
         }
 
@@ -309,11 +308,10 @@
             dom.recordButton.addEventListener('click', toggleRecording);
             dom.midiLearnButton.addEventListener('click', toggleMidiLearn);
             
-            dom.beatRepeatButton.addEventListener('mousedown', handleBeatRepeatStart);
-            dom.beatRepeatButton.addEventListener('mouseup', handleBeatRepeatEnd);
-            dom.beatRepeatButton.addEventListener('mouseleave', handleBeatRepeatEnd);
-            dom.beatRepeatButton.addEventListener('touchstart', (e) => { e.preventDefault(); handleBeatRepeatStart(); }, {passive: false});
-            dom.beatRepeatButton.addEventListener('touchend', handleBeatRepeatEnd);
+            // Beat Repeat with Pointer Events for better response
+            dom.beatRepeatButton.addEventListener('pointerdown', handleBeatRepeatStart);
+            dom.beatRepeatButton.addEventListener('pointerup', handleBeatRepeatEnd);
+            dom.beatRepeatButton.addEventListener('pointerleave', handleBeatRepeatEnd);
 
             document.querySelectorAll('.learnable').forEach(el => el.addEventListener('click', setLearnTarget));
             Object.values(dom.effects).forEach(el => el.addEventListener('input', e => {
@@ -425,6 +423,12 @@
         function learnMidiControl(cc) {
             if (!activeLearnTarget) return;
             const controlId = activeLearnTarget.dataset.control;
+            // Clear any old mapping for this control
+            for (const key in ccToControlMap) {
+                if (ccToControlMap[key] === controlId) {
+                    delete ccToControlMap[key];
+                }
+            }
             ccToControlMap[cc] = controlId;
             activeLearnTarget.classList.remove('waiting-for-midi');
             activeLearnTarget = null;
