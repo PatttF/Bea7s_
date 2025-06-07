@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bea7s_</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tone.js for Web Audio -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; touch-action: manipulation; }
+        .step { transition: all 0.1s ease; position: relative; min-width: 32px; min-height: 40px; }
+        .step.active { background-color: #f59e0b; }
+        .step.current { box-shadow: inset 0 0 0 3px #facc15; }
+        #step-editor { transition: opacity 0.15s ease-in-out, transform 0.15s ease-in-out; }
+        input[type="file"]::file-selector-button { @apply bg-gray-600 hover:bg-gray-500 text-white font-semibold py-1 px-3 rounded-lg cursor-pointer transition-colors; }
+        .ratchet-btn.selected { @apply bg-amber-500 text-white; }
+        .effect-btn:active { @apply ring-2 ring-amber-400 transform scale-95; }
+        
+        /* MIDI Learn and Record Styles */
+        #record-button.recording { @apply bg-red-600 ring-2 ring-red-400; }
+        #midi-learn-button.learning { @apply bg-amber-500 text-black ring-2 ring-amber-300; }
+        .learnable.learning-active { @apply ring-2 ring-blue-500 cursor-pointer; }
+        .learnable.waiting-for-midi { @apply ring-2 ring-amber-500 animate-pulse; }
+    </style>
+     <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gray-800 text-white flex items-center justify-center min-h-screen p-2 sm:p-4">
+
+    <!-- Startup Modal -->
+    <div id="startup-modal" class="absolute inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 cursor-pointer">
+        <div class="text-center p-4">
+            <h2 class="text-3xl font-bold mb-4">Welcome to Bea7s_</h2>
+            <p class="mb-6 text-gray-300">Click the button to start the audio context.</p>
+            <button id="start-button" class="bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 px-6 rounded-lg text-xl shadow-lg transition-transform transform hover:scale-105">Start</button>
+        </div>
+    </div>
+
+    <!-- Main Sequencer Container -->
+    <div id="sequencer-container" class="w-full max-w-7xl bg-gray-900 rounded-2xl shadow-2xl p-4 sm:p-6 hidden relative">
+        <div class="flex flex-col items-center justify-center mb-6">
+            <svg width="60" height="60" viewBox="0 0 200 200" class="mb-3">
+                <defs><linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#f59e0b;stop-opacity:1" /><stop offset="100%" style="stop-color:#facc15;stop-opacity:1" /></linearGradient></defs>
+                <circle cx="100" cy="100" r="95" fill="none" stroke="url(#logoGradient)" stroke-width="12"/><text x="50%" y="52%" dominant-baseline="central" text-anchor="middle" font-family="Inter, sans-serif" font-size="80" font-weight="800" fill="url(#logoGradient)">B7</text>
+            </svg>
+            <h1 class="text-4xl font-extrabold text-center text-amber-400 tracking-wider">Bea<span class="text-amber-500">7</span>s_</h1>
+        </div>
+
+        <div class="flex flex-col md:flex-row items-center justify-between gap-4 mb-6 bg-gray-800 p-4 rounded-lg">
+            <div class="flex items-center gap-4 flex-wrap justify-center">
+                <button id="record-button" title="Arm for MIDI Recording" class="bg-gray-600 hover:bg-gray-500 p-2 rounded-full transition-colors"><svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16z"/></svg></button>
+                <button id="play-stop-button" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-6 rounded-lg transition-colors">Play</button>
+                <button id="mutate-button" class="effect-btn bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Mutate</button>
+                <button id="midi-learn-button" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">MIDI Learn</button>
+            </div>
+            <div class="flex items-center gap-2">
+                <label for="bpm-slider" class="font-medium">BPM:</label>
+                <input type="range" id="bpm-slider" data-control="bpm" min="60" max="240" value="120" class="learnable w-32 sm:w-48">
+                <span id="bpm-display" class="font-mono bg-gray-700 px-2 py-1 rounded w-16 text-center">120</span>
+            </div>
+        </div>
+
+        <div id="sequencer-grid-container" class="overflow-x-auto"><div id="sequencer-grid" class="grid gap-1 mb-6" style="grid-template-columns: 120px repeat(16, 1fr);"></div></div>
+        
+        <!-- Global Effects Section -->
+        <div id="effects-section" class="bg-gray-800 p-4 rounded-lg mt-8">
+            <h2 class="text-xl font-semibold mb-4 text-center text-amber-300">Global Effects</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Filter -->
+                <div class="bg-gray-700 p-4 rounded-lg space-y-3">
+                    <h3 class="font-bold text-center">Filter</h3>
+                    <div class="flex items-center gap-2"><label class="w-20">Frequency</label><input type="range" data-control="filterFreq" id="filter-freq-slider" min="200" max="12000" value="12000" class="learnable w-full"></div>
+                    <div class="flex items-center gap-2"><label class="w-20">Resonance</label><input type="range" data-control="filterRes" id="filter-res-slider" min="0" max="20" value="0" step="0.1" class="learnable w-full"></div>
+                </div>
+                <!-- Delay -->
+                <div class="bg-gray-700 p-4 rounded-lg space-y-3">
+                    <h3 class="font-bold text-center">Delay</h3>
+                    <div class="flex items-center gap-2"><label class="w-20">Time</label><select id="delay-time-select" data-control="delayTime" class="learnable bg-gray-600 rounded p-1 w-full"><option value="8n">8th</option><option value="4n">4th</option><option value="2n">2nd</option></select></div>
+                    <div class="flex items-center gap-2"><label class="w-20">Feedback</label><input type="range" data-control="delayFeedback" id="delay-feedback-slider" min="0" max="0.9" value="0" step="0.01" class="learnable w-full"></div>
+                    <div class="flex items-center gap-2"><label class="w-20">Wet</label><input type="range" data-control="delayWet" id="delay-wet-slider" min="0" max="1" value="0" step="0.01" class="learnable w-full"></div>
+                </div>
+                <!-- Reverb -->
+                <div class="bg-gray-700 p-4 rounded-lg space-y-3">
+                    <h3 class="font-bold text-center">Reverb</h3>
+                    <div class="flex items-center gap-2"><label class="w-20">Decay</label><input type="range" data-control="reverbDecay" id="reverb-decay-slider" min="0.1" max="10" value="0.1" step="0.1" class="learnable w-full"></div>
+                    <div class="flex items-center gap-2"><label class="w-20">Wet</label><input type="range" data-control="reverbWet" id="reverb-wet-slider" min="0" max="1" value="0" step="0.01" class="learnable w-full"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-gray-800 p-4 rounded-lg mt-8">
+             <h2 class="text-xl font-semibold mb-3 text-center text-amber-300">MIDI Settings</h2>
+             <div id="midi-status" class="text-center text-sm text-gray-400 mb-4">Initializing MIDI...</div>
+             <div class="flex flex-col sm:flex-row justify-around gap-4">
+                 <div class="flex-1"><label for="midi-input-select" class="block mb-1 font-medium">MIDI Input:</label><select id="midi-input-select" class="w-full bg-gray-700 text-white p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"><option>No devices found</option></select></div>
+                 <div class="flex-1"><label for="midi-output-select" class="block mb-1 font-medium">MIDI Output:</label><select id="midi-output-select" class="w-full bg-gray-700 text-white p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"><option>No devices found</option></select></div>
+             </div>
+         </div>
+    </div>
+    
+    <div id="step-editor" class="absolute z-20 bg-gray-700 p-4 rounded-lg shadow-2xl hidden opacity-0 transform scale-95" data-row="-1" data-col="-1">
+        <div class="flex justify-between items-center mb-3"><h3 class="font-bold text-lg">Edit Step</h3><button id="close-editor-btn" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button></div>
+        <div class="space-y-4">
+            <div class="flex items-center justify-between"><label for="step-active-toggle" class="font-medium">Active</label><input type="checkbox" id="step-active-toggle" class="form-checkbox h-5 w-5 text-amber-500 bg-gray-800 border-gray-600 rounded focus:ring-amber-500"></div>
+            <div><label for="velocity-slider" class="block font-medium mb-1">Velocity</label><input type="range" id="velocity-slider" min="0" max="100" value="100" class="w-full"></div>
+            <div><label class="block font-medium mb-2">Ratchet</label><div id="ratchet-controls" class="grid grid-cols-4 gap-2"><button data-value="1" class="ratchet-btn bg-gray-600 hover:bg-gray-500 rounded p-2">1x</button><button data-value="2" class="ratchet-btn bg-gray-600 hover:bg-gray-500 rounded p-2">2x</button><button data-value="3" class="ratchet-btn bg-gray-600 hover:bg-gray-500 rounded p-2">3x</button><button data-value="4" class="ratchet-btn bg-gray-600 hover:bg-gray-500 rounded p-2">4x</button></div></div>
+        </div>
+    </div>
+
+    <script type="module">
+        const NUM_TRACKS = 12, TOTAL_STEPS = 16, LONG_PRESS_DURATION = 400;
+        let trackNames = ["Kick", "Snare", "Closed Hat", "Clap", "Open Hat", "Low Tom", "Rimshot", "Cowbell", "Mid Tom", "Hi Tom", "Shaker", "Conga"];
+        const MIDI_NOTES = [ 36, 38, 42, 39, 46, 41, 37, 56, 45, 48, 70, 63 ]; 
+
+        const dom = {
+            startupModal: document.getElementById('startup-modal'), startButton: document.getElementById('start-button'),
+            sequencerContainer: document.getElementById('sequencer-container'), gridContainer: document.getElementById('sequencer-grid'),
+            playStopButton: document.getElementById('play-stop-button'), bpmSlider: document.getElementById('bpm-slider'), bpmDisplay: document.getElementById('bpm-display'),
+            mutateButton: document.getElementById('mutate-button'), recordButton: document.getElementById('record-button'), midiLearnButton: document.getElementById('midi-learn-button'),
+            midiStatus: document.getElementById('midi-status'), midiInputSelect: document.getElementById('midi-input-select'), midiOutputSelect: document.getElementById('midi-output-select'),
+            stepEditor: document.getElementById('step-editor'), closeEditorBtn: document.getElementById('close-editor-btn'), stepActiveToggle: document.getElementById('step-active-toggle'), velocitySlider: document.getElementById('velocity-slider'), ratchetControls: document.getElementById('ratchet-controls'),
+            effects: {
+                filterFreq: document.getElementById('filter-freq-slider'), filterRes: document.getElementById('filter-res-slider'),
+                delayTime: document.getElementById('delay-time-select'), delayFeedback: document.getElementById('delay-feedback-slider'), delayWet: document.getElementById('delay-wet-slider'),
+                reverbDecay: document.getElementById('reverb-decay-slider'), reverbWet: document.getElementById('reverb-wet-slider'),
+            }
+        };
+
+        let samplers = [], gridState = [], midiAccess = null, selectedMidiInput = null, selectedMidiOutput = null, isInitialized = false, pressTimer = null, currentStep = 0;
+        let fx = {}, masterChannel;
+        let isMidiLearnActive = false, activeLearnTarget = null, ccToControlMap = {};
+        let isRecordingActive = false;
+
+        async function initialize() {
+            if (isInitialized) return;
+            isInitialized = true;
+            await Tone.start();
+            initializeGridState();
+            setupSamplers();
+            setupEffects();
+            renderGrid();
+            setupEventListeners();
+            initializeMIDI();
+            
+            new Tone.Sequence((time, col) => {
+                currentStep = col;
+                Tone.Draw.schedule(() => updatePlayhead(col), time);
+                for (let row = 0; row < NUM_TRACKS; row++) {
+                    if (gridState[row][col].active) playStep(row, gridState[row][col], time);
+                }
+            }, Array.from({ length: TOTAL_STEPS }, (_, i) => i), "16n").start(0);
+            
+            Tone.Transport.loop = true; Tone.Transport.loopEnd = '1m';
+            Tone.Transport.bpm.value = dom.bpmSlider.value;
+            
+            dom.startupModal.style.display = 'none';
+            dom.sequencerContainer.style.display = 'block';
+        }
+        
+        function initializeGridState() {
+             for (let row = 0; row < NUM_TRACKS; row++) {
+                gridState[row] = Array.from({length: TOTAL_STEPS}, () => ({ active: false, velocity: 1.0, ratchet: 1 }));
+            }
+        }
+        
+        function setupEffects() {
+            fx.filter = new Tone.Filter(20000, "lowpass").toDestination();
+            fx.delay = new Tone.FeedbackDelay("8n", 0).connect(fx.filter);
+            fx.reverb = new Tone.Reverb(0.1).connect(fx.filter);
+            masterChannel = new Tone.Channel().fan(fx.delay, fx.reverb, fx.filter);
+        }
+
+        function playStep(row, step, time) {
+            if (!samplers[row] && !selectedMidiOutput) return;
+            const sixteenthNoteDuration = Tone.Time('16n').toSeconds(), ratchetDuration = sixteenthNoteDuration / step.ratchet, noteDuration = '32n';
+            const midiVelocity = Math.floor(step.velocity * 127);
+            for (let i = 0; i < step.ratchet; i++) {
+                const playTime = time + i * ratchetDuration;
+                if(samplers[row]) samplers[row].triggerAttackRelease('C2', noteDuration, playTime, step.velocity);
+                if (selectedMidiOutput) {
+                    selectedMidiOutput.send([0x90, MIDI_NOTES[row], midiVelocity], playTime * 1000);
+                    selectedMidiOutput.send([0x80, MIDI_NOTES[row], 0], (playTime + Tone.Time(noteDuration).toSeconds()) * 1000);
+                }
+            }
+        }
+        
+        function setupSamplers() { samplers = Array(NUM_TRACKS).fill(null); }
+
+        function renderGrid() {
+            dom.gridContainer.innerHTML = '';
+            for (let row = 0; row < NUM_TRACKS; row++) {
+                const trackLabelDiv = document.createElement('div');
+                trackLabelDiv.className = 'flex flex-col items-start justify-center pr-2';
+                const trackName = document.createElement('div');
+                trackName.textContent = trackNames[row];
+                trackName.className = 'font-semibold text-sm truncate cursor-pointer hover:text-amber-400';
+                trackName.dataset.row = row;
+                trackName.addEventListener('dblclick', handleRenameStart);
+                trackLabelDiv.appendChild(trackName);
+                const fileInput = document.createElement('input');
+                fileInput.type = 'file'; fileInput.accept = 'audio/wav';
+                fileInput.className = 'text-xs w-full mt-1'; fileInput.dataset.row = row;
+                fileInput.addEventListener('change', handleFileLoad);
+                trackLabelDiv.appendChild(fileInput);
+                dom.gridContainer.appendChild(trackLabelDiv);
+                for (let col = 0; col < TOTAL_STEPS; col++) {
+                    const stepButton = document.createElement('button');
+                    stepButton.className = 'step h-12 bg-gray-700 rounded-md text-xs font-bold';
+                    stepButton.dataset.row = row; stepButton.dataset.col = col;
+                    dom.gridContainer.appendChild(stepButton);
+                    updateStepVisuals(row, col);
+                }
+            }
+        }
+
+        function updatePlayhead(col) {
+            dom.gridContainer.querySelectorAll('.current').forEach(el => el.classList.remove('current'));
+            dom.gridContainer.querySelectorAll(`[data-col="${col}"]`).forEach(button => button.classList.add('current'));
+        }
+
+        function setupEventListeners() {
+            dom.playStopButton.addEventListener('click', () => {
+                const isPlaying = Tone.Transport.state === 'started';
+                isPlaying ? Tone.Transport.stop() : Tone.Transport.start();
+                dom.playStopButton.textContent = isPlaying ? 'Play' : 'Stop';
+                dom.playStopButton.classList.toggle('bg-red-500', !isPlaying); dom.playStopButton.classList.toggle('hover:bg-red-600', !isPlaying);
+                dom.playStopButton.classList.toggle('bg-green-500', isPlaying); dom.playStopButton.classList.toggle('hover:bg-green-600', isPlaying);
+            });
+            dom.bpmSlider.addEventListener('input', e => updateControl('bpm', e.target.value));
+            
+            const clearPressTimer = () => clearTimeout(pressTimer);
+            const handlePressStart = (e) => { if (e.target.matches('.step')) { if(e.type === 'touchstart') e.preventDefault(); pressTimer = setTimeout(() => openStepEditor(e.target), LONG_PRESS_DURATION); } };
+            const handlePressEnd = (e) => { if (e.target.matches('.step') && pressTimer) { clearPressTimer(); toggleStep(e.target); } };
+            dom.gridContainer.addEventListener('mousedown', handlePressStart);
+            dom.gridContainer.addEventListener('mouseup', handlePressEnd);
+            dom.gridContainer.addEventListener('mouseleave', clearPressTimer, true);
+            dom.gridContainer.addEventListener('touchstart', handlePressStart, {passive: false});
+            dom.gridContainer.addEventListener('touchend', handlePressEnd);
+            dom.gridContainer.addEventListener('touchmove', clearPressTimer);
+
+            dom.closeEditorBtn.addEventListener('click', closeStepEditor);
+            dom.stepActiveToggle.addEventListener('change', handleEditorChange);
+            dom.velocitySlider.addEventListener('input', handleEditorChange);
+            dom.ratchetControls.addEventListener('click', (e) => { if (e.target.matches('button')) { dom.ratchetControls.querySelector('.selected')?.classList.remove('selected'); e.target.classList.add('selected'); handleEditorChange(); } });
+        
+            dom.mutateButton.addEventListener('click', handleMutate);
+            dom.recordButton.addEventListener('click', toggleRecording);
+            dom.midiLearnButton.addEventListener('click', toggleMidiLearn);
+            
+            document.querySelectorAll('.learnable').forEach(el => el.addEventListener('click', setLearnTarget));
+        }
+        
+        function handleRenameStart(e) {
+            const trackNameDiv = e.target; const row = parseInt(trackNameDiv.dataset.row); const currentName = trackNames[row];
+            const input = document.createElement('input'); input.type = 'text'; input.value = currentName; input.className = 'bg-gray-600 text-white text-sm font-semibold rounded px-1 w-full';
+            const confirmRename = () => { const newName = input.value.trim() || `Track ${row + 1}`; trackNames[row] = newName; trackNameDiv.textContent = newName; trackNameDiv.style.display = ''; input.replaceWith(trackNameDiv); };
+            input.addEventListener('blur', confirmRename);
+            input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); if (e.key === 'Escape') { input.value = currentName; input.blur(); } });
+            trackNameDiv.style.display = 'none'; trackNameDiv.parentElement.insertBefore(input, trackNameDiv); input.focus(); input.select();
+        }
+
+        function handleMutate() {
+            for (let r = 0; r < NUM_TRACKS; r++) {
+                for (let c = 0; c < TOTAL_STEPS; c++) {
+                    if (Math.random() > 0.85) gridState[r][c].active = !gridState[r][c].active;
+                    if (gridState[r][c].active) {
+                        if (Math.random() > 0.8) gridState[r][c].velocity = Math.random() * 0.7 + 0.3;
+                        if (Math.random() > 0.9) gridState[r][c].ratchet = Math.floor(Math.random() * 2) + 1;
+                    }
+                }
+            }
+            renderGrid();
+        }
+
+        function toggleStep(stepElement) {
+            const { row, col } = stepElement.dataset;
+            gridState[row][col].active = !gridState[row][col].active;
+            updateStepVisuals(parseInt(row), parseInt(col));
+        }
+
+        function openStepEditor(stepElement) {
+            pressTimer = null; 
+            const { row, col } = stepElement.dataset; dom.stepEditor.dataset.row = row; dom.stepEditor.dataset.col = col;
+            const stepData = gridState[row][col];
+            dom.stepActiveToggle.checked = stepData.active; dom.velocitySlider.value = stepData.velocity * 100;
+            dom.ratchetControls.querySelector('.selected')?.classList.remove('selected');
+            dom.ratchetControls.querySelector(`[data-value="${stepData.ratchet}"]`).classList.add('selected');
+            const rect = stepElement.getBoundingClientRect();
+            dom.stepEditor.style.left = `${Math.min(rect.left + window.scrollX, window.innerWidth - dom.stepEditor.offsetWidth - 20)}px`;
+            dom.stepEditor.style.top = `${rect.bottom + window.scrollY + 5}px`;
+            dom.stepEditor.classList.remove('hidden'); setTimeout(() => dom.stepEditor.classList.remove('opacity-0', 'scale-95'), 10);
+        }
+
+        function closeStepEditor() { dom.stepEditor.classList.add('opacity-0', 'scale-95'); setTimeout(() => dom.stepEditor.classList.add('hidden'), 150); }
+
+        function handleEditorChange() {
+            const row = parseInt(dom.stepEditor.dataset.row), col = parseInt(dom.stepEditor.dataset.col);
+            if (row < 0 || col < 0) return;
+            gridState[row][col] = {
+                active: dom.stepActiveToggle.checked, velocity: parseInt(dom.velocitySlider.value) / 100,
+                ratchet: parseInt(dom.ratchetControls.querySelector('.selected').dataset.value)
+            };
+            updateStepVisuals(row, col);
+        }
+        
+        function updateStepVisuals(row, col) {
+            const step = gridState[row][col];
+            const stepButton = dom.gridContainer.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+            if (!stepButton) return;
+            stepButton.classList.toggle('active', step.active);
+            stepButton.style.opacity = step.active ? step.velocity * 0.7 + 0.3 : 0.5;
+            stepButton.textContent = step.ratchet > 1 ? `${step.ratchet}x` : '';
+        }
+
+        async function handleFileLoad(event) {
+            const file = event.target.files[0]; const row = parseInt(event.target.dataset.row);
+            if (!file || isNaN(row)) return;
+            const url = URL.createObjectURL(file);
+            try {
+                samplers[row]?.dispose();
+                samplers[row] = new Tone.Sampler({ urls: { C2: url },
+                    onload: () => { 
+                        trackNames[row] = file.name.replace(/\.wav$/i, '').substring(0, 12);
+                        const trackLabel = dom.gridContainer.querySelector(`div[data-row="${row}"]`);
+                        if(trackLabel) trackLabel.textContent = trackNames[row];
+                        samplers[row].connect(masterChannel);
+                    }
+                });
+            } catch (error) { console.error("Error loading audio file:", error); }
+        }
+
+        // --- New MIDI Learn and Record Functions ---
+        function toggleRecording() {
+            isRecordingActive = !isRecordingActive;
+            dom.recordButton.classList.toggle('recording', isRecordingActive);
+        }
+
+        function toggleMidiLearn() {
+            isMidiLearnActive = !isMidiLearnActive;
+            dom.midiLearnButton.classList.toggle('learning', isMidiLearnActive);
+            document.querySelectorAll('.learnable').forEach(el => el.classList.toggle('learning-active', isMidiLearnActive));
+            if (!isMidiLearnActive && activeLearnTarget) {
+                activeLearnTarget.classList.remove('waiting-for-midi');
+                activeLearnTarget = null;
+            }
+        }
+        
+        function setLearnTarget(e) {
+            if (!isMidiLearnActive) return;
+            if (activeLearnTarget) activeLearnTarget.classList.remove('waiting-for-midi');
+            activeLearnTarget = e.target;
+            activeLearnTarget.classList.add('waiting-for-midi');
+        }
+
+        function learnMidiControl(cc) {
+            if (!activeLearnTarget) return;
+            const controlId = activeLearnTarget.dataset.control;
+            ccToControlMap[cc] = controlId;
+            activeLearnTarget.classList.remove('waiting-for-midi');
+            activeLearnTarget = null;
+        }
+
+        function updateControl(controlId, value, isMidi=false) {
+            let element, elValue;
+            switch(controlId) {
+                case 'bpm':
+                    elValue = isMidi ? (value / 127) * 180 + 60 : value;
+                    Tone.Transport.bpm.value = elValue;
+                    dom.bpmSlider.value = elValue;
+                    dom.bpmDisplay.textContent = Math.round(elValue);
+                    break;
+                case 'filterFreq':
+                    elValue = isMidi ? Math.pow(value/127, 3) * (12000 - 200) + 200 : value;
+                    fx.filter.frequency.value = elValue;
+                    dom.effects.filterFreq.value = elValue;
+                    break;
+                 case 'filterRes':
+                    elValue = isMidi ? (value/127) * 20 : value;
+                    fx.filter.Q.value = elValue;
+                    dom.effects.filterRes.value = elValue;
+                    break;
+                case 'delayTime':
+                    if (isMidi) {
+                        const options = ["8n", "4n", "2n"];
+                        elValue = options[Math.floor(value / 127 * (options.length - 0.01))];
+                        dom.effects.delayTime.value = elValue;
+                    } else { elValue = value; }
+                    fx.delay.delayTime.value = elValue;
+                    break;
+                case 'delayFeedback':
+                    elValue = isMidi ? (value/127) * 0.9 : value;
+                    fx.delay.feedback.value = elValue;
+                    dom.effects.delayFeedback.value = elValue;
+                    break;
+                case 'delayWet':
+                    elValue = isMidi ? value/127 : value;
+                    fx.delay.wet.value = elValue;
+                    dom.effects.delayWet.value = elValue;
+                    break;
+                case 'reverbDecay':
+                    elValue = isMidi ? (value/127) * 9.9 + 0.1 : value;
+                    fx.reverb.decay = elValue;
+                    dom.effects.reverbDecay.value = elValue;
+                    break;
+                case 'reverbWet':
+                    elValue = isMidi ? value/127 : value;
+                    fx.reverb.wet.value = elValue;
+                    dom.effects.reverbWet.value = elValue;
+                    break;
+            }
+        }
+        
+        async function initializeMIDI() {
+            if (!navigator.requestMIDIAccess) { dom.midiStatus.textContent = 'Web MIDI API not supported.'; return; }
+            try {
+                midiAccess = await navigator.requestMIDIAccess();
+                dom.midiStatus.textContent = 'MIDI Ready.'; dom.midiStatus.style.color = '#34d399';
+                const updateDevices = () => {
+                    dom.midiInputSelect.innerHTML = '<option value="">None</option>' + [...midiAccess.inputs.values()].map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+                    dom.midiOutputSelect.innerHTML = '<option value="">None</option>' + [...midiAccess.outputs.values()].map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+                };
+                updateDevices();
+                midiAccess.onstatechange = updateDevices;
+                dom.midiInputSelect.onchange = e => { if (selectedMidiInput) selectedMidiInput.onmidimessage = null; selectedMidiInput = midiAccess.inputs.get(e.target.value) || null; if (selectedMidiInput) selectedMidiInput.onmidimessage = handleMidiMessage; };
+                dom.midiOutputSelect.onchange = e => { selectedMidiOutput = midiAccess.outputs.get(e.target.value) || null; };
+            } catch(e) { dom.midiStatus.textContent = 'Could not access MIDI devices.'; dom.midiStatus.style.color = '#f87171'; }
+        }
+
+        function handleMidiMessage(message) {
+            const [command, data1, data2] = message.data;
+            const cmd = command & 0xF0;
+            
+            if (cmd === 176) { // CC message
+                if (isMidiLearnActive && activeLearnTarget) {
+                    learnMidiControl(data1);
+                } else if (ccToControlMap[data1]) {
+                    updateControl(ccToControlMap[data1], data2, true);
+                }
+            } else if (cmd === 144 && data2 > 0) { // Note On
+                const trackIndex = MIDI_NOTES.indexOf(data1);
+                if (trackIndex > -1) {
+                    if (isRecordingActive) {
+                        gridState[trackIndex][currentStep] = { active: true, velocity: data2/127, ratchet: 1 };
+                        updateStepVisuals(trackIndex, currentStep);
+                    }
+                    playStep(trackIndex, { active: true, velocity: data2/127, ratchet: 1 }, Tone.now());
+                }
+            }
+        }
+
+        dom.startButton.addEventListener('click', initialize);
+        dom.startupModal.addEventListener('click', e => { if (e.target === dom.startupModal) initialize(); });
+    </script>
+</body>
+</html>
