@@ -16,7 +16,7 @@
         #step-editor { transition: opacity 0.15s ease-in-out, transform 0.15s ease-in-out; }
         input[type="file"]::file-selector-button { @apply bg-gray-600 hover:bg-gray-500 text-white font-semibold py-1 px-3 rounded-lg cursor-pointer transition-colors; }
         .ratchet-btn.selected { @apply bg-amber-500 text-white; }
-        .effect-btn:active { @apply ring-2 ring-amber-400 transform scale-95; }
+        .effect-btn:active, #beat-repeat-button.active { @apply ring-2 ring-amber-400 transform scale-95; }
         
         /* MIDI Learn and Record Styles */
         #record-button.recording { @apply bg-red-600 ring-2 ring-red-400; }
@@ -53,6 +53,7 @@
             <div class="flex items-center gap-4 flex-wrap justify-center">
                 <button id="record-button" title="Arm for MIDI Recording" class="bg-gray-600 hover:bg-gray-500 p-2 rounded-full transition-colors"><svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16z"/></svg></button>
                 <button id="play-stop-button" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-6 rounded-lg transition-colors">Play</button>
+                <button id="beat-repeat-button" data-control="beatRepeat" class="learnable effect-btn bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Repeat</button>
                 <button id="mutate-button" class="effect-btn bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Mutate</button>
                 <button id="midi-learn-button" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">MIDI Learn</button>
             </div>
@@ -68,7 +69,12 @@
         <!-- Global Effects Section -->
         <div id="effects-section" class="bg-gray-800 p-4 rounded-lg mt-8">
             <h2 class="text-xl font-semibold mb-4 text-center text-amber-300">Global Effects</h2>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <!-- Vinyl -->
+                <div class="bg-gray-700 p-4 rounded-lg space-y-3">
+                    <h3 class="font-bold text-center">Vinyl</h3>
+                    <div class="flex items-center gap-2"><label class="w-20">Drive</label><input type="range" data-control="vinylDrive" id="vinyl-drive-slider" min="0" max="1" value="0" step="0.01" class="learnable w-full"></div>
+                </div>
                 <!-- Filter -->
                 <div class="bg-gray-700 p-4 rounded-lg space-y-3">
                     <h3 class="font-bold text-center">Filter</h3>
@@ -111,7 +117,7 @@
     </div>
 
     <script type="module">
-        const NUM_TRACKS = 12, TOTAL_STEPS = 16, LONG_PRESS_DURATION = 400;
+        const NUM_TRACKS = 12, TOTAL_STEPS = 16, LONG_PRESS_DURATION = 400, REPEAT_LENGTH = 4;
         let trackNames = ["Kick", "Snare", "Closed Hat", "Clap", "Open Hat", "Low Tom", "Rimshot", "Cowbell", "Mid Tom", "Hi Tom", "Shaker", "Conga"];
         const MIDI_NOTES = [ 36, 38, 42, 39, 46, 41, 37, 56, 45, 48, 70, 63 ]; 
 
@@ -120,9 +126,11 @@
             sequencerContainer: document.getElementById('sequencer-container'), gridContainer: document.getElementById('sequencer-grid'),
             playStopButton: document.getElementById('play-stop-button'), bpmSlider: document.getElementById('bpm-slider'), bpmDisplay: document.getElementById('bpm-display'),
             mutateButton: document.getElementById('mutate-button'), recordButton: document.getElementById('record-button'), midiLearnButton: document.getElementById('midi-learn-button'),
+            beatRepeatButton: document.getElementById('beat-repeat-button'),
             midiStatus: document.getElementById('midi-status'), midiInputSelect: document.getElementById('midi-input-select'), midiOutputSelect: document.getElementById('midi-output-select'),
             stepEditor: document.getElementById('step-editor'), closeEditorBtn: document.getElementById('close-editor-btn'), stepActiveToggle: document.getElementById('step-active-toggle'), velocitySlider: document.getElementById('velocity-slider'), ratchetControls: document.getElementById('ratchet-controls'),
             effects: {
+                vinylDrive: document.getElementById('vinyl-drive-slider'),
                 filterFreq: document.getElementById('filter-freq-slider'), filterRes: document.getElementById('filter-res-slider'),
                 delayTime: document.getElementById('delay-time-select'), delayFeedback: document.getElementById('delay-feedback-slider'), delayWet: document.getElementById('delay-wet-slider'),
                 reverbDecay: document.getElementById('reverb-decay-slider'), reverbWet: document.getElementById('reverb-wet-slider'),
@@ -167,10 +175,22 @@
         }
         
         function setupEffects() {
-            fx.filter = new Tone.Filter(20000, "lowpass").toDestination();
-            fx.delay = new Tone.FeedbackDelay("8n", 0).connect(fx.filter);
-            fx.reverb = new Tone.Reverb(0.1).connect(fx.filter);
-            masterChannel = new Tone.Channel().fan(fx.delay, fx.reverb, fx.filter);
+            // Re-chain effects serially for more standard behavior
+            fx.reverb = new Tone.Reverb().toDestination();
+            fx.delay = new Tone.FeedbackDelay().connect(fx.reverb);
+            fx.filter = new Tone.Filter().connect(fx.delay);
+            fx.distortion = new Tone.Distortion(0).connect(fx.filter);
+            masterChannel = new Tone.Channel().connect(fx.distortion);
+            
+            // Set initial values from DOM
+            fx.reverb.wet.value = dom.effects.reverbWet.value;
+            fx.reverb.decay = dom.effects.reverbDecay.value;
+            fx.delay.wet.value = dom.effects.delayWet.value;
+            fx.delay.feedback.value = dom.effects.delayFeedback.value;
+            fx.delay.delayTime.value = dom.effects.delayTime.value;
+            fx.filter.frequency.value = dom.effects.filterFreq.value;
+            fx.filter.Q.value = dom.effects.filterRes.value;
+            fx.distortion.distortion = dom.effects.vinylDrive.value;
         }
 
         function playStep(row, step, time) {
@@ -250,7 +270,18 @@
             dom.recordButton.addEventListener('click', toggleRecording);
             dom.midiLearnButton.addEventListener('click', toggleMidiLearn);
             
+            dom.beatRepeatButton.addEventListener('mousedown', handleBeatRepeatStart);
+            dom.beatRepeatButton.addEventListener('mouseup', handleBeatRepeatEnd);
+            dom.beatRepeatButton.addEventListener('mouseleave', handleBeatRepeatEnd);
+            dom.beatRepeatButton.addEventListener('touchstart', (e) => { e.preventDefault(); handleBeatRepeatStart(); }, {passive: false});
+            dom.beatRepeatButton.addEventListener('touchend', handleBeatRepeatEnd);
+
             document.querySelectorAll('.learnable').forEach(el => el.addEventListener('click', setLearnTarget));
+            Object.values(dom.effects).forEach(el => el.addEventListener('input', e => {
+                const controlId = e.target.dataset.control;
+                const value = e.target.tagName === 'SELECT' ? e.target.value : parseFloat(e.target.value);
+                updateControl(controlId, value);
+            }));
         }
         
         function handleRenameStart(e) {
@@ -332,12 +363,7 @@
             } catch (error) { console.error("Error loading audio file:", error); }
         }
 
-        // --- New MIDI Learn and Record Functions ---
-        function toggleRecording() {
-            isRecordingActive = !isRecordingActive;
-            dom.recordButton.classList.toggle('recording', isRecordingActive);
-        }
-
+        function toggleRecording() { isRecordingActive = !isRecordingActive; dom.recordButton.classList.toggle('recording', isRecordingActive); }
         function toggleMidiLearn() {
             isMidiLearnActive = !isMidiLearnActive;
             dom.midiLearnButton.classList.toggle('learning', isMidiLearnActive);
@@ -347,14 +373,12 @@
                 activeLearnTarget = null;
             }
         }
-        
         function setLearnTarget(e) {
             if (!isMidiLearnActive) return;
             if (activeLearnTarget) activeLearnTarget.classList.remove('waiting-for-midi');
-            activeLearnTarget = e.target;
+            activeLearnTarget = e.currentTarget; // Use currentTarget to get the element with the listener
             activeLearnTarget.classList.add('waiting-for-midi');
         }
-
         function learnMidiControl(cc) {
             if (!activeLearnTarget) return;
             const controlId = activeLearnTarget.dataset.control;
@@ -363,14 +387,31 @@
             activeLearnTarget = null;
         }
 
+        function handleBeatRepeatStart() {
+            dom.beatRepeatButton.classList.add('active');
+            const repeatStartStep = Math.floor(currentStep / REPEAT_LENGTH) * REPEAT_LENGTH;
+            Tone.Transport.loopStart = Tone.Time(`${repeatStartStep} * 16n`);
+            Tone.Transport.loopEnd = Tone.Time(`${repeatStartStep + REPEAT_LENGTH} * 16n`);
+        }
+        function handleBeatRepeatEnd() {
+            dom.beatRepeatButton.classList.remove('active');
+            Tone.Transport.loopStart = 0;
+            Tone.Transport.loopEnd = '1m';
+        }
+
         function updateControl(controlId, value, isMidi=false) {
-            let element, elValue;
+            let elValue;
             switch(controlId) {
                 case 'bpm':
                     elValue = isMidi ? (value / 127) * 180 + 60 : value;
                     Tone.Transport.bpm.value = elValue;
                     dom.bpmSlider.value = elValue;
                     dom.bpmDisplay.textContent = Math.round(elValue);
+                    break;
+                case 'vinylDrive':
+                    elValue = isMidi ? value/127 : value;
+                    fx.distortion.distortion = elValue;
+                    dom.effects.vinylDrive.value = elValue;
                     break;
                 case 'filterFreq':
                     elValue = isMidi ? Math.pow(value/127, 3) * (12000 - 200) + 200 : value;
@@ -409,6 +450,12 @@
                     elValue = isMidi ? value/127 : value;
                     fx.reverb.wet.value = elValue;
                     dom.effects.reverbWet.value = elValue;
+                    break;
+                case 'beatRepeat':
+                    // This is a momentary button
+                    if (isMidi) {
+                        value > 64 ? handleBeatRepeatStart() : handleBeatRepeatEnd();
+                    }
                     break;
             }
         }
