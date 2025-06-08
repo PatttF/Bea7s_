@@ -518,14 +518,6 @@
             }
 
             switch(controlId) {
-                case 'bpm-slider': Tone.Transport.bpm.value = value; dom.bpmDisplay.textContent = Math.round(value); break;
-                case 'vinyl-drive-slider': fx.distortion.distortion = value; break;
-                case 'filter-freq-slider': fx.masterFilter.frequency.value = value; break;
-                case 'filter-res-slider': fx.masterFilter.Q.value = value; break;
-                case 'ringmod-freq-slider': fx.ringMod.frequency.value = value; break;
-                case 'ringmod-wet-slider': fx.ringMod.wet.value = value; break;
-                case 'freeverb-room-slider': fx.freeverb.roomSize.value = value; break;
-                case 'freeverb-wet-slider': fx.freeverb.wet.value = value; break;
             }
         }
         
