@@ -14,7 +14,7 @@
         body { font-family: 'Orbitron', 'Inter', sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; touch-action: manipulation; }
         .step { transition: all 0.1s ease; position: relative; min-height: 40px; }
         .step.active { background-color: #f59e0b; }
-        .step.current { box-shadow: inset 0 0 0 3px #00ffff; }
+        .step.current { box-shadow: inset 0 0 0 3px #00ffff; } /* Cyan for cyberpunk theme */
         .editor-popup { transition: opacity 0.15s ease-in-out, transform 0.15s ease-in-out; font-family: 'Inter', sans-serif; }
         input[type="file"]::file-selector-button { @apply bg-gray-600 hover:bg-gray-500 text-white font-semibold py-1 px-3 rounded-lg cursor-pointer transition-colors; }
         .ratchet-btn.selected { @apply bg-amber-500 text-white; }
@@ -49,7 +49,7 @@
     <!-- Main Sequencer Container -->
     <div id="sequencer-container" class="w-full max-w-7xl bg-gray-900 rounded-2xl shadow-2xl p-4 sm:p-6 hidden relative">
         <div class="flex flex-col items-center justify-center mb-6">
-            <!-- Logo -->
+            <!-- Cyberpunk Logo -->
             <svg width="150" height="70" viewBox="-30 -15 210 100">
                 <defs>
                     <linearGradient id="cyberGradient" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#00ffff;"/><stop offset="100%" style="stop-color:#ff00ff;"/></linearGradient>
@@ -111,7 +111,8 @@
             beatRepeatButton: document.getElementById('beat-repeat-button'),
             midi: { status: document.getElementById('midi-status'), inputSelect: document.getElementById('midi-input-select'), outputSelect: document.getElementById('midi-output-select'), inputChannel: document.getElementById('midi-input-channel'), outputChannel: document.getElementById('midi-output-channel'), },
             stepEditor: { root: document.getElementById('step-editor'), closeBtn: document.getElementById('close-step-editor-btn'), activeToggle: document.getElementById('step-active-toggle'), velocitySlider: document.getElementById('velocity-slider'), ratchetControls: document.getElementById('ratchet-controls'), },
-            trackEditor: { root: document.getElementById('track-editor'), closeBtn: document.getElementById('close-track-editor-btn'), controlsContainer: document.getElementById('track-editor-controls'), title: document.getElementById('track-editor-title'), },}
+            trackEditor: { root: document.getElementById('track-editor'), closeBtn: document.getElementById('close-track-editor-btn'), controlsContainer: document.getElementById('track-editor-controls'), title: document.getElementById('track-editor-title'), },
+            effects: { vinylDrive: document.getElementById('vinyl-drive-slider'), filterFreq: document.getElementById('filter-freq-slider'), filterRes: document.getElementById('filter-res-slider'), delayTime: document.getElementById('delay-time-select'), delayFeedback: document.getElementById('delay-feedback-slider'), delayWet: document.getElementById('delay-wet-slider'), reverbDecay: document.getElementById('reverb-decay-slider'), reverbWet: document.getElementById('reverb-wet-slider'), }
         };
 
         let soundSources = [], trackFxChains = [], gridState = [], midiAccess = null, selectedMidiInput = null, selectedMidiOutput = null, isInitialized = false, pressTimer = null, currentStep = 0;
@@ -152,6 +153,13 @@
         
         function setupAudioRouting() {
             // Global (Send) Effects
+            fx.reverb = new Tone.Reverb(2).toDestination();
+            fx.delay = new Tone.PingPongDelay("8n", 0.25).toDestination();
+            
+            // Global (Insert) Effects
+            fx.distortion = new Tone.Distortion(0);
+            fx.masterFilter = new Tone.Filter(20000, "lowpass");
+            const masterChain = new Tone.Channel(0).chain(fx.masterFilter, fx.distortion, Tone.Destination);
 
             // Per-track chains
             trackFxChains = Array(NUM_TRACKS).fill(null).map(() => {
@@ -495,6 +503,14 @@
             }
 
             switch(controlId) {
+                case 'bpm-slider': Tone.Transport.bpm.value = value; dom.bpmDisplay.textContent = Math.round(value); break;
+                case 'vinyl-drive-slider': fx.distortion.distortion = value; break;
+                case 'filter-freq-slider': fx.masterFilter.frequency.value = value; break;
+                case 'filter-res-slider': fx.masterFilter.Q.value = value; break;
+                case 'ringmod-freq-slider': fx.ringMod.frequency.value = value; break;
+                case 'ringmod-wet-slider': fx.ringMod.wet.value = value; break;
+                case 'freeverb-room-slider': fx.freeverb.roomSize.value = value; break;
+                case 'freeverb-wet-slider': fx.freeverb.wet.value = value; break;
             }
         }
         
