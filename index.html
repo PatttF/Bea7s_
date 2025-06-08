@@ -111,8 +111,7 @@
             beatRepeatButton: document.getElementById('beat-repeat-button'),
             midi: { status: document.getElementById('midi-status'), inputSelect: document.getElementById('midi-input-select'), outputSelect: document.getElementById('midi-output-select'), inputChannel: document.getElementById('midi-input-channel'), outputChannel: document.getElementById('midi-output-channel'), },
             stepEditor: { root: document.getElementById('step-editor'), closeBtn: document.getElementById('close-step-editor-btn'), activeToggle: document.getElementById('step-active-toggle'), velocitySlider: document.getElementById('velocity-slider'), ratchetControls: document.getElementById('ratchet-controls'), },
-            trackEditor: { root: document.getElementById('track-editor'), closeBtn: document.getElementById('close-track-editor-btn'), controlsContainer: document.getElementById('track-editor-controls'), title: document.getElementById('track-editor-title'), },
-            effects: { vinylDrive: document.getElementById('vinyl-drive-slider'), filterFreq: document.getElementById('filter-freq-slider'), filterRes: document.getElementById('filter-res-slider'), delayTime: document.getElementById('delay-time-select'), delayFeedback: document.getElementById('delay-feedback-slider'), delayWet: document.getElementById('delay-wet-slider'), reverbDecay: document.getElementById('reverb-decay-slider'), reverbWet: document.getElementById('reverb-wet-slider'), }
+            trackEditor: { root: document.getElementById('track-editor'), closeBtn: document.getElementById('close-track-editor-btn'), controlsContainer: document.getElementById('track-editor-controls'), title: document.getElementById('track-editor-title'), },}
         };
 
         let soundSources = [], trackFxChains = [], gridState = [], midiAccess = null, selectedMidiInput = null, selectedMidiOutput = null, isInitialized = false, pressTimer = null, currentStep = 0;
