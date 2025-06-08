@@ -8,6 +8,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Tone.js for Web Audio -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <!-- @tonejs/midi for parsing/writing .mid files -->
+    <script src="https://cdn.jsdelivr.net/npm/@tonejs/midi@2.0.28/build/Midi.js"></script>
     <style>
         body { font-family: 'Orbitron', 'Inter', sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; touch-action: manipulation; }
         .step { transition: all 0.1s ease; position: relative; min-height: 40px; }
@@ -31,11 +33,13 @@
         <div class="text-center p-4">
             <h2 class="text-3xl font-bold mb-4">Welcome to Bea7s_</h2>
             <p class="mb-2 text-gray-300 font-sans">Click the button to start, then:</p>
-            <ul class="text-left max-w-sm mx-auto list-disc list-inside text-gray-400 font-sans space-y-1 mb-6">
+            <ul class="text-left max-w-md mx-auto list-disc list-inside text-gray-400 font-sans space-y-1 mb-6">
                 <li>Built-in synths play by default.</li>
                 <li>Load a .wav file to replace a synth.</li>
                 <li>Click a square to toggle a note.</li>
                 <li>Click &amp; hold a note to edit velocity/ratchet.</li>
+                <li>Click the track icon for options.</li>
+                 <li>Double-click a track name to rename it.</li>
                 <li>Use the Record button to play in a beat via MIDI.</li>
             </ul>
             <button id="start-button" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-6 rounded-lg text-xl shadow-lg transition-transform transform hover:scale-105">Start</button>
@@ -46,7 +50,7 @@
     <div id="sequencer-container" class="w-full max-w-7xl bg-gray-900 rounded-2xl shadow-2xl p-4 sm:p-6 hidden relative">
         <div class="flex flex-col items-center justify-center mb-6">
             <!-- Cyberpunk Logo -->
-            <svg width="150" height="70" viewBox="-20 -10 190 90">
+            <svg width="150" height="70" viewBox="-30 -15 210 100">
                 <defs>
                     <linearGradient id="cyberGradient" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#00ffff;"/><stop offset="100%" style="stop-color:#ff00ff;"/></linearGradient>
                     <filter id="glitch"><feTurbulence type="fractalNoise" baseFrequency="0.1" numOctaves="1" result="turbulence"/><feDisplacementMap in="SourceGraphic" in2="turbulence" scale="3" xChannelSelector="R" yChannelSelector="G"/></filter>
@@ -59,9 +63,12 @@
         <div class="flex flex-col md:flex-row items-center justify-between gap-4 mb-6 bg-gray-800 p-4 rounded-lg">
             <div class="flex items-center gap-4 flex-wrap justify-center">
                 <button id="record-button" title="Arm for MIDI Recording" class="bg-gray-600 hover:bg-gray-500 p-2 rounded-full transition-colors"><svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16z"/></svg></button>
-                <button id="play-stop-button" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-6 rounded-lg transition-colors">Play</button>
-                <button id="beat-repeat-button" class="effect-btn bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Repeat</button>
-                <button id="mutate-button" class="effect-btn bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Mutate</button>
+                <button id="play-stop-button" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-1 px-3 rounded-lg transition-colors">Play</button>
+                <button id="beat-repeat-button" class="effect-btn bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-1 px-3 rounded-lg transition-colors">Repeat</button>
+                <button id="mutate-button" class="effect-btn bg-purple-500 hover:bg-purple-600 text-white font-semibold py-1 px-3 rounded-lg transition-colors">Mutate</button>
+                <button id="save-midi-button" class="effect-btn bg-teal-500 hover:bg-teal-600 text-white font-semibold py-1 px-3 rounded-lg transition-colors">Save MIDI</button>
+                <button id="load-midi-button" class="effect-btn bg-cyan-500 hover:bg-cyan-600 text-white font-semibold py-1 px-3 rounded-lg transition-colors">Load MIDI</button>
+                <input type="file" id="midi-file-input" class="hidden" accept=".mid,.midi">
             </div>
             <div class="flex items-center gap-2">
                 <label for="bpm-slider" class="font-medium font-sans">BPM:</label>
@@ -114,7 +121,8 @@
             startupModal: document.getElementById('startup-modal'), startButton: document.getElementById('start-button'),
             sequencerContainer: document.getElementById('sequencer-container'), gridContainer: document.getElementById('sequencer-grid'),
             playStopButton: document.getElementById('play-stop-button'), bpmSlider: document.getElementById('bpm-slider'), bpmDisplay: document.getElementById('bpm-display'),
-            mutateButton: document.getElementById('mutate-button'), recordButton: document.getElementById('record-button'),
+            mutateButton: document.getElementById('mutate-button'), recordButton: document.getElementById('record-button'), saveMidiButton: document.getElementById('save-midi-button'),
+            loadMidiButton: document.getElementById('load-midi-button'), midiFileInput: document.getElementById('midi-file-input'),
             beatRepeatButton: document.getElementById('beat-repeat-button'),
             midi: { status: document.getElementById('midi-status'), inputSelect: document.getElementById('midi-input-select'), outputSelect: document.getElementById('midi-output-select'), inputChannel: document.getElementById('midi-input-channel'), outputChannel: document.getElementById('midi-output-channel'), },
             stepEditor: { root: document.getElementById('step-editor'), closeBtn: document.getElementById('close-step-editor-btn'), activeToggle: document.getElementById('step-active-toggle'), velocitySlider: document.getElementById('velocity-slider'), ratchetControls: document.getElementById('ratchet-controls'), },
@@ -122,9 +130,9 @@
             effects: { vinylDrive: document.getElementById('vinyl-drive-slider'), filterFreq: document.getElementById('filter-freq-slider'), filterRes: document.getElementById('filter-res-slider'), delayTime: document.getElementById('delay-time-select'), delayFeedback: document.getElementById('delay-feedback-slider'), delayWet: document.getElementById('delay-wet-slider'), reverbDecay: document.getElementById('reverb-decay-slider'), reverbWet: document.getElementById('reverb-wet-slider'), }
         };
 
-        let soundSources = [], trackChannels = [], gridState = [], midiAccess = null, selectedMidiInput = null, selectedMidiOutput = null, isInitialized = false, pressTimer = null, currentStep = 0;
+        let soundSources = [], trackFxChains = [], gridState = [], midiAccess = null, selectedMidiInput = null, selectedMidiOutput = null, isInitialized = false, pressTimer = null, currentStep = 0;
         let selectedMidiInputChannel = 'all', selectedMidiOutputChannel = 1;
-        let fx = {}, masterChannel;
+        let fx = {};
         let isRecordingActive = false;
         let synthParams = [];
 
@@ -159,39 +167,52 @@
         }
         
         function setupAudioRouting() {
-            fx.reverb = new Tone.Reverb().toDestination();
-            fx.delay = new Tone.FeedbackDelay().connect(fx.reverb);
-            fx.filter = new Tone.Filter().connect(fx.delay);
-            fx.distortion = new Tone.Distortion(0).connect(fx.filter);
-            masterChannel = new Tone.Channel().connect(fx.distortion);
+            // Global (Send) Effects
+            fx.reverb = new Tone.Reverb(2).toDestination();
+            fx.delay = new Tone.PingPongDelay("8n", 0.25).toDestination();
             
-            trackChannels = Array(NUM_TRACKS).fill(null).map(() => new Tone.Channel(0).connect(masterChannel));
+            // Global (Insert) Effects
+            fx.distortion = new Tone.Distortion(0);
+            fx.masterFilter = new Tone.Filter(20000, "lowpass");
+            const masterChain = new Tone.Channel(0).chain(fx.masterFilter, fx.distortion, Tone.Destination);
+
+            // Per-track chains
+            trackFxChains = Array(NUM_TRACKS).fill(null).map(() => {
+                const channel = new Tone.Channel(0).connect(masterChain);
+                const filter = new Tone.Filter(20000, 'lowpass').connect(channel);
+                const reverbSend = new Tone.Gain(0).connect(fx.reverb);
+                const delaySend = new Tone.Gain(0).connect(fx.delay);
+                
+                channel.connect(delaySend);
+                channel.connect(reverbSend);
+
+                return { channel, filter, delaySend, reverbSend };
+            });
+
             createDefaultSynths();
-            
-            Object.values(dom.effects).forEach(el => updateControl(el.id, el.tagName === 'SELECT' ? el.value : parseFloat(el.value)));
         }
 
         function createDefaultSynths() {
-            soundSources = trackChannels.map((channel, i) => {
+            soundSources = trackFxChains.map((track, i) => {
                 let synth;
                 let params = {};
                 switch (i) {
                     case 0: params = { pitchDecay: 0.05, octaves: 10, oscillator: { type: "sine" }, envelope: { attack: 0.001, decay: 0.4, sustain: 0.01, release: 1.4, attackCurve: "exponential" } }; synth = new Tone.MembraneSynth(params); break;
-                    case 1: params = { noise: { type: "white" }, envelope: { attack: 0.001, decay: 0.1, sustain: 0, release: 0.1 } }; synth = new Tone.NoiseSynth(params); break;
+                    case 1: params = { noise: { type: "white" }, envelope: { attack: 0.001, decay: 0.1, sustain: 0, release: 0.1 }, filter: { type: 'highpass', Q: 1, frequency: 100 }, filterEnvelope: { attack: 0.005, decay: 0.05, baseFrequency: 3000 } }; synth = new Tone.NoiseSynth(params); break;
                     case 2: params = { frequency: 200, envelope: { attack: 0.001, decay: 0.1, release: 0.05 }, harmonicity: 5.1, modulationIndex: 32, resonance: 8000, octaves: 1.5 }; synth = new Tone.MetalSynth(params); break;
-                    case 3: params = { noise: { type: "pink" }, envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.05 } }; synth = new Tone.NoiseSynth(params); break;
+                    case 3: params = { noise: { type: "pink" }, envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.05 }, filter: { type: 'highpass', Q: 1, frequency: 100 } }; synth = new Tone.NoiseSynth(params); break;
                     case 4: params = { frequency: 200, envelope: { attack: 0.001, decay: 0.4, release: 0.2 }, harmonicity: 5.1, modulationIndex: 32, resonance: 8000, octaves: 1.5 }; synth = new Tone.MetalSynth(params); break;
                     case 5: params = { pitchDecay: 0.05, octaves: 6, oscillator: { type: "sine" }, envelope: { attack: 0.001, decay: 0.3, sustain: 0.01, release: 1 }, note: "A2" }; synth = new Tone.MembraneSynth(params); break;
                     case 6: params = { attackNoise: 1, dampening: 4000, resonance: 0.7, note: "C5" }; synth = new Tone.PluckSynth(params); break;
                     case 7: params = { frequency: 300, envelope: { attack: 0.001, decay: 0.4, release: 0.2 }, harmonicity: 3.1, modulationIndex: 20, resonance: 4000, octaves: 1.5 }; synth = new Tone.MetalSynth(params); break;
                     case 8: params = { pitchDecay: 0.05, octaves: 6, oscillator: { type: "sine" }, envelope: { attack: 0.001, decay: 0.3, sustain: 0.01, release: 1 }, note: "D3" }; synth = new Tone.MembraneSynth(params); break;
                     case 9: params = { pitchDecay: 0.05, octaves: 6, oscillator: { type: "sine" }, envelope: { attack: 0.001, decay: 0.2, sustain: 0.01, release: 0.8 }, note: "G3" }; synth = new Tone.MembraneSynth(params); break;
-                    case 10: params = { noise: { type: 'brown' }, envelope: { attack: 0.01, decay: 0.15, sustain: 0.05, release: 0.1 } }; synth = new Tone.NoiseSynth(params); break;
+                    case 10: params = { noise: { type: 'brown' }, envelope: { attack: 0.01, decay: 0.15, sustain: 0.05, release: 0.1 }, filter: {type: 'lowpass', frequency: 5000} }; synth = new Tone.NoiseSynth(params); break;
                     case 11: params = { pitchDecay: 0.02, octaves: 4, envelope: { attack: 0.002, decay: 0.15, sustain: 0, release: 0.1 }, note: 'G#3'}; synth = new Tone.MembraneSynth(params); break;
                     default: params = {}; synth = new Tone.MembraneSynth(params); break;
                 }
                 synthParams[i] = params;
-                return synth.connect(channel);
+                return synth.connect(track.filter);
             });
         }
         
@@ -304,6 +325,9 @@
             
             dom.mutateButton.addEventListener('click', handleMutate);
             dom.recordButton.addEventListener('click', toggleRecording);
+            dom.saveMidiButton.addEventListener('click', exportMidi);
+            dom.loadMidiButton.addEventListener('click', () => dom.midiFileInput.click());
+            dom.midiFileInput.addEventListener('change', handleMidiFileLoad);
             
             dom.beatRepeatButton.addEventListener('pointerdown', handleBeatRepeatStart);
             dom.beatRepeatButton.addEventListener('pointerup', handleBeatRepeatEnd);
@@ -352,33 +376,37 @@
             const row = parseInt(volumeButton.dataset.row);
             root.dataset.row = row;
             title.textContent = `${trackNames[row]} Controls`;
-            controlsContainer.innerHTML = ''; // Clear previous controls
+            controlsContainer.innerHTML = ''; 
             
             const source = soundSources[row];
+            const trackChain = trackFxChains[row];
 
-            // --- Always add Volume Control ---
-            const gainInDb = trackChannels[row].volume.value;
-            const sliderValue = Math.max(0, ((gainInDb + 60) / 60) * 100);
-            const volControl = createSliderControl('volume', 'Level', 0, 100, sliderValue, (val) => updateControl(`volume-track-${row}`, val));
+            const gainInDb = trackChain.channel.volume.value;
+            const sliderValue = Math.max(0, ((gainInDb + 48) / 48) * 100);
+            const volControl = createSliderControl(`volume-track-${row}`, 'Level', 0, 100, sliderValue, (val) => updateControl(`volume-track-${row}`, val));
             controlsContainer.appendChild(volControl);
 
-            // --- Add Synth-Specific Controls ---
+            controlsContainer.appendChild(createDivider('Per-Track Effects'));
+            const reverbControl = createSliderControl(`track-reverb-${row}`, 'Reverb', 0, 100, trackChain.reverbSend.gain.value * 100, (val) => updateControl(`track-reverb-${row}`, val));
+            controlsContainer.appendChild(reverbControl);
+            
             if (source && !(source instanceof Tone.Sampler)) {
+                controlsContainer.appendChild(createDivider('Synth Parameters'));
+                const currentSynthParams = synthParams[row];
                 if(source instanceof Tone.MembraneSynth) {
-                    const currentPitch = synthParams[row].note;
+                    const currentPitch = currentSynthParams.note;
                     const tuneVal = scale(Tone.Frequency(currentPitch).toMidi(), 30, 80, 0, 100);
-                    controlsContainer.appendChild(createSliderControl('synth-tune', 'Tune', 0, 100, tuneVal, (val) => updateControl(`synth-tune-${row}`, val)));
-                    const decayVal = synthParams[row].envelope.decay * 100;
-                    controlsContainer.appendChild(createSliderControl('synth-decay', 'Decay', 0, 100, decayVal, (val) => updateControl(`synth-decay-${row}`, val)));
+                    controlsContainer.appendChild(createSliderControl(`synth-tune-${row}`, 'Tune', 0, 100, tuneVal, (val) => updateControl(`synth-tune-${row}`, val)));
+                    const decayVal = currentSynthParams.envelope.decay * 100;
+                    controlsContainer.appendChild(createSliderControl(`synth-decay-${row}`, 'Decay', 0, 100, decayVal, (val) => updateControl(`synth-decay-${row}`, val)));
                 } else if (source instanceof Tone.NoiseSynth) {
-                     const decayVal = synthParams[row].envelope.decay * 100;
-                    controlsContainer.appendChild(createSliderControl('synth-decay', 'Decay', 0, 100, decayVal, (val) => updateControl(`synth-decay-${row}`, val)));
+                     const decayVal = currentSynthParams.envelope.decay * 100;
+                    controlsContainer.appendChild(createSliderControl(`synth-decay-${row}`, 'Decay', 0, 100, decayVal, (val) => updateControl(`synth-decay-${row}`, val)));
                 } else if (source instanceof Tone.MetalSynth) {
-                     const harmVal = synthParams[row].harmonicity * 10;
-                    controlsContainer.appendChild(createSliderControl('synth-harmonicity', 'Harmonicity', 0, 100, harmVal, (val) => updateControl(`synth-harmonicity-${row}`, val)));
+                     const harmVal = currentSynthParams.harmonicity * 10;
+                    controlsContainer.appendChild(createSliderControl(`synth-harmonicity-${row}`, 'Harmonicity', 1, 100, harmVal, (val) => updateControl(`synth-harmonicity-${row}`, val)));
                 }
             }
-
             const rect = volumeButton.getBoundingClientRect();
             root.style.left = `${rect.left + window.scrollX}px`;
             root.style.top = `${rect.bottom + window.scrollY + 5}px`;
@@ -391,6 +419,22 @@
             container.className = 'flex items-center gap-2';
             container.innerHTML = `<label class="w-20">${label}</label><input type="range" id="${id}" min="${min}" max="${max}" value="${value}" class="w-full">`;
             container.querySelector('input').addEventListener('input', (e) => callback(e.target.value));
+            return container;
+        }
+
+        function createDropdownControl(id, label, options, value, callback) {
+            const container = document.createElement('div');
+            container.className = 'flex items-center gap-2';
+            let optionsHTML = options.map(opt => `<option value="${opt}" ${opt === value ? 'selected' : ''}>${opt}</option>`).join('');
+            container.innerHTML = `<label class="w-20">${label}</label><select id="${id}" class="bg-gray-600 rounded p-1 w-full">${optionsHTML}</select>`;
+            container.querySelector('select').addEventListener('change', (e) => callback(e.target.value));
+            return container;
+        }
+        
+        function createDivider(text) {
+            const container = document.createElement('div');
+            container.className = 'text-center text-xs text-gray-400 font-bold uppercase tracking-wider py-1 border-t border-b border-gray-600 mt-2 mb-2';
+            container.textContent = text;
             return container;
         }
 
@@ -424,7 +468,7 @@
                         trackNames[row] = file.name.replace(/\.wav$/i, '').substring(0, 12);
                         const trackNameDiv = dom.gridContainer.querySelector(`div[data-row="${row}"]`);
                         if(trackNameDiv) trackNameDiv.textContent = trackNames[row];
-                        soundSources[row].connect(trackChannels[row]);
+                        soundSources[row].connect(trackFxChains[row].channel);
                     }
                 });
             } catch (error) { console.error("Error loading audio file:", error); }
@@ -440,48 +484,132 @@
             if (controlId.startsWith('volume-track-')) {
                 const trackIndex = parseInt(controlId.replace('volume-track-', ''));
                 const gain = scale(value, 0, 100, -48, 0); 
-                if(trackChannels[trackIndex]) trackChannels[trackIndex].volume.value = gain;
+                if(trackFxChains[trackIndex]) trackFxChains[trackIndex].channel.volume.value = gain;
                 return;
             }
-            // Synth Controls
+            if(controlId.startsWith('track-')) {
+                const [_, param, row] = controlId.split('-');
+                const fxChain = trackFxChains[row];
+                let numValue = parseFloat(value);
+                 switch(param) {
+                    case 'reverb': fxChain.reverbSend.gain.value = scale(numValue, 0, 100, 0, 1); break;
+                 }
+                 return;
+            }
             if (controlId.startsWith('synth-')) {
                 const [_, param, row] = controlId.split('-');
                 const synth = soundSources[row];
                 if (!synth || synth instanceof Tone.Sampler) return;
                 
+                let numValue = parseFloat(value);
+                let paramsToSet = {};
+
                 switch(param) {
                     case 'tune':
-                        const midiNote = scale(value, 0, 100, 30, 80);
-                        const newNote = Tone.Frequency(midiNote, 'midi').toNote()
+                        const midiNote = scale(numValue, 0, 100, 30, 80);
+                        const newNote = Tone.Frequency(midiNote, 'midi').toNote();
                         synth.set({note: newNote});
                         synthParams[row].note = newNote;
                         break;
-                    case 'decay':
-                         synth.envelope.set({decay: value / 100});
-                         synthParams[row].envelope.decay = value / 100;
-                         break;
-                    case 'harmonicity':
-                         const newHarm = value / 10;
-                         synth.set({harmonicity: newHarm});
-                         synthParams[row].harmonicity = newHarm;
-                         break;
+                    case 'decay': paramsToSet = { envelope: { decay: numValue / 100 } }; synthParams[row].envelope.decay = numValue / 100; break;
                 }
+                 if(Object.keys(paramsToSet).length > 0) synth.set(paramsToSet);
                 return;
             }
 
             switch(controlId) {
                 case 'bpm-slider': Tone.Transport.bpm.value = value; dom.bpmDisplay.textContent = Math.round(value); break;
                 case 'vinyl-drive-slider': fx.distortion.distortion = value; break;
-                case 'filter-freq-slider': fx.filter.frequency.value = value; break;
-                case 'filter-res-slider': fx.filter.Q.value = value; break;
-                case 'delay-time-select': fx.delay.delayTime.value = value; break;
-                case 'delay-feedback-slider': fx.delay.feedback.value = value; break;
-                case 'delay-wet-slider': fx.delay.wet.value = value; break;
-                case 'reverb-decay-slider': fx.reverb.decay = value; break;
-                case 'reverb-wet-slider': fx.reverb.wet.value = value; break;
+                case 'filter-freq-slider': fx.masterFilter.frequency.value = value; break;
+                case 'filter-res-slider': fx.masterFilter.Q.value = value; break;
+                case 'ringmod-freq-slider': fx.ringMod.frequency.value = value; break;
+                case 'ringmod-wet-slider': fx.ringMod.wet.value = value; break;
+                case 'freeverb-room-slider': fx.freeverb.roomSize.value = value; break;
+                case 'freeverb-wet-slider': fx.freeverb.wet.value = value; break;
             }
         }
         
+        async function handleMidiFileLoad(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async (event) => {
+                try {
+                    const midi = new Midi(event.target.result);
+                    initializeGridState(); // Clear the grid
+                    const sixteenthNoteDuration = Tone.Time('16n').toSeconds();
+                    
+                    if (midi.tracks.length > 0) {
+                        midi.tracks[0].notes.forEach(note => {
+                            const trackIndex = MIDI_NOTES.indexOf(note.midi);
+                            if (trackIndex > -1) {
+                                const stepIndex = Math.round(note.time / sixteenthNoteDuration);
+                                if (stepIndex < TOTAL_STEPS) {
+                                    gridState[trackIndex][stepIndex] = {
+                                        active: true,
+                                        velocity: note.velocity,
+                                        ratchet: 1
+                                    };
+                                }
+                            }
+                        });
+                    }
+                    renderGrid();
+                } catch(err) {
+                    console.error("Error parsing MIDI file:", err);
+                    alert("Could not parse the selected MIDI file.");
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        async function exportMidi() {
+             if (typeof Midi === 'undefined') {
+                alert('MIDI library not loaded. Cannot export MIDI.');
+                return;
+            }
+            try {
+                const midi = new Midi();
+                midi.header.setTempo(parseInt(dom.bpmSlider.value));
+                
+                const track = midi.addTrack();
+                track.name = "Bea7s_ Pattern";
+                
+                for(let i=0; i < NUM_TRACKS; i++) {
+                    for(let j=0; j < TOTAL_STEPS; j++) {
+                        const step = gridState[i][j];
+                        if (step.active) {
+                            const sixteenthNoteDuration = Tone.Time('16n').toSeconds();
+                            const ratchetDuration = sixteenthNoteDuration / step.ratchet;
+                            for (let k = 0; k < step.ratchet; k++) {
+                               const noteTime = (j * sixteenthNoteDuration) + (k * ratchetDuration);
+                               track.addNote({
+                                    midi: MIDI_NOTES[i],
+                                    time: noteTime,
+                                    duration: ratchetDuration,
+                                    velocity: step.velocity
+                               });
+                            }
+                        }
+                    }
+                }
+
+                const blob = new Blob([midi.toArray()], { type: 'audio/midi' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Bea7s_Pattern_${Date.now()}.mid`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } catch (err) {
+                 console.error("MIDI Export failed:", err);
+                 alert("An error occurred while exporting the MIDI file.");
+            }
+        }
+
         async function initializeMIDI() {
             if (!navigator.requestMIDIAccess) { dom.midi.status.textContent = 'Web MIDI API not supported.'; return; }
             try {
@@ -523,7 +651,7 @@
                          if (source instanceof Tone.NoiseSynth){
                             source.triggerAttack(undefined, Tone.now(), data2 / 127);
                          } else {
-                            source.triggerAttack(source.get().note || MIDI_NOTES[trackIndex], Tone.now(), data2 / 127);
+                            source.triggerAttack(synthParams[trackIndex].note || MIDI_NOTES[trackIndex], Tone.now(), data2 / 127);
                          }
                     }
                 }
