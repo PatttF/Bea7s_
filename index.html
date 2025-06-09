@@ -126,7 +126,7 @@
             isInitialized = true;
             await Tone.start();
             initializeGridState();
-            setupAudioRouting();
+            createDefaultSynths();
             populateMidiChannels();
             renderGrid();
             setupEventListeners();
@@ -150,12 +150,8 @@
             }
         }
         
-        function setupAudioRouting() {
-            Tone.getDestination().volume.value = -9;
-            createDefaultSynths();
-        }
-
         function createDefaultSynths() {
+            Tone.getDestination().volume.value = -9;
             soundSources = Array.from({length: NUM_TRACKS}, (_, i) => {
                 let synth;
                 let params = {};
@@ -487,8 +483,7 @@
                 alert('MIDI library not loaded. Cannot export MIDI.');
                 return;
             }
-            const fileName = prompt("Enter a name for your MIDI file:", "Bea7s_Pattern");
-            if (!fileName) return;
+            const fileName = `Bea7s_Pattern_${Date.now()}`;
             try {
                 const midi = new Midi();
                 midi.header.setTempo(parseInt(dom.bpmSlider.value));
