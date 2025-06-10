@@ -12,13 +12,22 @@
     <script src="https://cdn.jsdelivr.net/npm/@tonejs/midi@2.0.28/build/Midi.js"></script>
     <style>
         body { font-family: 'Orbitron', 'Inter', sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; touch-action: manipulation; }
-        .step { transition: all 0.1s ease; position: relative; min-height: 40px; }
+        .step {
+            transition: all 0.1s ease;
+            position: relative;
+            min-height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+        }
         .step.active { background-color: #f59e0b; }
         .step.current { box-shadow: inset 0 0 0 3px #00ffff; } /* Cyan for cyberpunk theme */
+        .step.ratchet { background-color: #8b5cf6; } /* Purple for ratchet */
         .editor-popup { transition: opacity 0.15s ease-in-out, transform 0.15s ease-in-out; font-family: 'Inter', sans-serif; }
         input[type="file"]::file-selector-button { @apply bg-gray-600 hover:bg-gray-500 text-white font-semibold py-1 px-3 rounded-lg cursor-pointer transition-colors; }
         .ratchet-btn.selected { @apply bg-amber-500 text-white; }
-        .effect-btn:active, #beat-repeat-button.active { @apply ring-2 ring-amber-400 transform scale-95; }
+        .effect-btn:active { @apply ring-2 ring-amber-400 transform scale-95; }
         
         #record-button.recording { @apply bg-red-600 ring-2 ring-red-400; }
     </style>
@@ -64,7 +73,6 @@
             <div class="flex items-center gap-4 flex-wrap justify-center">
                 <button id="record-button" title="Arm for MIDI Recording" class="bg-gray-600 hover:bg-gray-500 p-2 rounded-full transition-colors"><svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16z"/></svg></button>
                 <button id="play-stop-button" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-1 px-3 rounded-lg transition-colors">Play</button>
-                <button id="beat-repeat-button" class="effect-btn bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-1 px-3 rounded-lg transition-colors">Repeat</button>
                 <button id="mutate-button" class="effect-btn bg-purple-500 hover:bg-purple-600 text-white font-semibold py-1 px-3 rounded-lg transition-colors">Mutate</button>
                 <button id="clear-steps-button" class="effect-btn bg-red-500 hover:bg-red-600 text-white font-semibold py-1 px-3 rounded-lg transition-colors">Clear</button>
                 <button id="save-midi-button" class="effect-btn bg-teal-500 hover:bg-teal-600 text-white font-semibold py-1 px-3 rounded-lg transition-colors">Save MIDI</button>
@@ -99,7 +107,7 @@
     <div id="track-editor" class="editor-popup absolute z-20 bg-gray-700 p-4 rounded-lg shadow-2xl hidden opacity-0 transform scale-95 w-64" data-row="-1"><div class="flex justify-between items-center mb-3"><h3 id="track-editor-title" class="font-bold text-lg">Track</h3><button id="close-track-editor-btn" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button></div><div id="track-editor-controls" class="space-y-3"></div></div>
 
     <script type="module">
-        const NUM_TRACKS = 12, TOTAL_STEPS = 16, LONG_PRESS_DURATION = 400, REPEAT_LENGTH = 4;
+        const NUM_TRACKS = 12, TOTAL_STEPS = 16, LONG_PRESS_DURATION = 400;
         let trackNames = ["Kick", "Snare", "Closed Hat", "Clap", "Open Hat", "Low Tom", "Rimshot", "Cowbell", "Mid Tom", "Hi Tom", "Shaker", "Conga"];
         const MIDI_NOTES = [ 36, 38, 42, 39, 46, 41, 37, 56, 45, 48, 70, 63 ]; 
 
@@ -110,7 +118,6 @@
             mutateButton: document.getElementById('mutate-button'), recordButton: document.getElementById('record-button'), saveMidiButton: document.getElementById('save-midi-button'),
             loadMidiButton: document.getElementById('load-midi-button'), midiFileInput: document.getElementById('midi-file-input'),
             clearStepsButton: document.getElementById('clear-steps-button'),
-            beatRepeatButton: document.getElementById('beat-repeat-button'),
             midi: { status: document.getElementById('midi-status'), inputSelect: document.getElementById('midi-input-select'), outputSelect: document.getElementById('midi-output-select'), inputChannel: document.getElementById('midi-input-channel'), outputChannel: document.getElementById('midi-output-channel'), },
             stepEditor: { root: document.getElementById('step-editor'), closeBtn: document.getElementById('close-step-editor-btn'), activeToggle: document.getElementById('step-active-toggle'), velocitySlider: document.getElementById('velocity-slider'), ratchetControls: document.getElementById('ratchet-controls'), },
             trackEditor: { root: document.getElementById('track-editor'), closeBtn: document.getElementById('close-track-editor-btn'), controlsContainer: document.getElementById('track-editor-controls'), title: document.getElementById('track-editor-title'), }
@@ -291,10 +298,6 @@
             dom.saveMidiButton.addEventListener('click', exportMidi);
             dom.loadMidiButton.addEventListener('click', () => dom.midiFileInput.click());
             dom.midiFileInput.addEventListener('change', handleMidiFileLoad);
-            
-            dom.beatRepeatButton.addEventListener('pointerdown', handleBeatRepeatStart);
-            dom.beatRepeatButton.addEventListener('pointerup', handleBeatRepeatEnd);
-            dom.beatRepeatButton.addEventListener('pointerleave', handleBeatRepeatEnd);
         }
         
         function handleRenameStart(e) {
@@ -315,7 +318,7 @@
 
                         if (step.active) {
                             step.velocity = Math.random() * 0.7 + 0.3;
-                            step.ratchet = Math.floor(Math.random() * 2) + 1;
+                            step.ratchet = Math.floor(Math.random() * 4) + 1;
                         } else {
                             step.velocity = 1.0;
                             step.ratchet = 1;
@@ -408,7 +411,12 @@
             if (!stepButton) return;
             stepButton.classList.toggle('active', step.active);
             stepButton.style.opacity = step.active ? step.velocity * 0.7 + 0.3 : 0.5;
-            stepButton.textContent = step.ratchet > 1 ? `${step.ratchet}x` : '';
+            stepButton.textContent = '';
+            if (step.ratchet > 1) {
+                stepButton.classList.add('ratchet');
+            } else {
+                stepButton.classList.remove('ratchet');
+            }
         }
 
         async function handleFileLoad(event) {
