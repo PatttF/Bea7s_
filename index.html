@@ -41,7 +41,7 @@
         }
         .sequencer-wrapper {
             flex-grow: 1;
-            overflow-y: auto; /* vertical scroll for the grid */
+            overflow-y: auto;
             min-height: 0;
         }
         .top-controls-wrapper {
@@ -53,6 +53,7 @@
         .bottom-controls {
             flex-shrink: 0; background-color: var(--controls-color);
             padding: 0.75rem; border-top: 1px solid #4a5568;
+            transition: all 0.3s ease-in-out;
         }
         .sequencer-grid {
             display: grid;
@@ -60,7 +61,7 @@
             gap: 4px; padding: 4px;
         }
         .step {
-            transition: all 0.1s ease;
+            transition: background-color 0.1s ease, transform 0.1s ease;
             cursor: pointer; border-radius: 4px;
             background-color: var(--step-off-color);
             border: 1px solid transparent;
@@ -93,7 +94,7 @@
             border-radius: 4px; padding: 0.5rem; color: var(--text-color);
             transition: all 0.2s ease-in-out;
         }
-        button:hover, label:hover {
+        button:hover, label[for="load-input"]:hover {
             border-color: var(--primary-color);
             color: white;
         }
@@ -136,8 +137,9 @@
     
     <div class="top-controls-wrapper">
         <h1 class="logo">Bea<span>7</span>s_</h1>
-        <div class="flex flex-col sm:flex-row items-center justify-between gap-4 max-w-7xl mx-auto">
-             <div class="flex items-center gap-4 w-full sm:w-auto">
+        <!-- CHANGE: Added flex-wrap for responsiveness -->
+        <div class="flex flex-wrap sm:flex-nowrap items-center justify-between gap-4 max-w-7xl mx-auto">
+             <div class="flex items-center gap-2 w-full sm:w-auto">
                 <button id="play-stop" class="font-bold py-2 px-4 rounded-lg">Play</button>
                 <div class="flex items-center gap-2 flex-grow">
                     <label for="bpm" class="text-sm font-medium">BPM</label>
@@ -145,11 +147,12 @@
                     <span id="bpm-value" class="font-mono w-12 text-center text-sm">120</span>
                 </div>
             </div>
-             <div class="flex items-center gap-2 w-full sm:w-auto">
-                <button id="record-btn" class="font-bold p-2 rounded-lg">Record</button>
-                <button id="clear-btn" class="font-bold p-2 rounded-lg">Clear</button>
-                <button id="mutate" class="font-bold p-2 rounded-lg">Mutate</button>
-                <button id="beat-repeat-btn" class="font-bold py-2 px-4 rounded-lg w-auto">Repeat</button>
+             <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <button id="record-btn" class="font-bold p-2 rounded-lg text-xs">Rec</button>
+                <button id="clear-btn" class="font-bold p-2 rounded-lg text-xs">Clr</button>
+                <button id="mutate" class="font-bold p-2 rounded-lg text-xs">Mut</button>
+                <button id="beat-repeat-btn" class="font-bold py-2 px-3 rounded-lg text-xs">Repeat</button>
+                <button id="midi-toggle-btn" class="font-bold p-2 rounded-lg text-xs">MIDI</button>
              </div>
         </div>
     </div>
@@ -160,7 +163,7 @@
         </div>
     </div>
     
-    <div class="bottom-controls">
+    <div id="bottom-controls" class="bottom-controls hidden">
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-7xl mx-auto">
              <div class="md:col-start-2 control-group flex flex-col"><label class="text-xs" for="midi-input-device">MIDI In Device</label><select id="midi-input-device" class="w-full text-sm"></select></div>
              <div class="control-group flex flex-col"><label class="text-xs" for="midi-input-channel">MIDI In Ch</label><select id="midi-input-channel" class="w-full text-sm"></select></div>
@@ -175,7 +178,7 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const NUM_STEPS = 16;
-            const NUM_TRACKS = 12; // CHANGE: Increased to 12 tracks
+            const NUM_TRACKS = 12;
             let trackNames = ['Kick', 'Snare', 'Clap', 'Hi-Hat', 'Tom 1', 'Tom 2', 'Cymbal', 'Perc', 'Conga', 'Cowbell', 'Clave', 'Maraca'];
             
             const noteMap = { 35: 0, 36: 0, 38: 1, 40: 1, 39: 2, 42: 3, 44: 3, 46: 3, 41: 4, 43: 4, 45: 4, 47: 5, 48: 5, 50: 5, 49: 6, 51: 6, 52: 6, 55: 6, 57: 6, 59: 6, 56: 7, 63: 8, 64: 8, 56: 9, 75: 10, 70: 11 };
@@ -203,6 +206,8 @@
                 beatRepeatBtn: document.getElementById('beat-repeat-btn'),
                 recordBtn: document.getElementById('record-btn'),
                 clearBtn: document.getElementById('clear-btn'),
+                midiToggleBtn: document.getElementById('midi-toggle-btn'),
+                bottomControls: document.getElementById('bottom-controls'),
                 midiInputDevice: document.getElementById('midi-input-device'),
                 midiOutputDevice: document.getElementById('midi-output-device'),
                 midiInputChannel: document.getElementById('midi-input-channel'),
@@ -234,41 +239,24 @@
                 const globalDelay = new Tone.FeedbackDelay("8n", 0.5).toDestination();
 
                 const createFxChain = () => {
-                    const panVol = new Tone.PanVol(0, 0);
+                    const panVol = new Tone.PanVol(0, 0).toDestination();
                     const reverbSend = new Tone.Gain(0).connect(globalReverb);
                     const delaySend = new Tone.Gain(0).connect(globalDelay);
-                    panVol.connect(Tone.Destination);
                     return { panVol, reverbSend, delaySend };
                 };
                 
-                const connectToFx = (source, fx) => {
-                    source.connect(fx.panVol);
-                    source.connect(fx.reverbSend);
-                    source.connect(fx.delaySend);
-                };
-
                 for(let i=0; i < NUM_TRACKS; i++) {
                     const fxChain = createFxChain();
                     let synth, type;
                     switch(i) {
-                        case 0: // Kick
-                           synth = new Tone.MembraneSynth({ pitchDecay: 0.05, octaves: 10, oscillator: { type: "sine" }, envelope: { attack: 0.001, decay: 0.4, sustain: 0.01, release: 1.4, attackCurve: "exponential" } });
-                           type = 'kick';
-                           break;
-                        case 1: // Snare
-                           synth = new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.005, decay: 0.2, sustain: 0 } });
-                           type = 'snare';
-                           break;
-                        case 3: // Hi-Hat
-                           synth = new Tone.MetalSynth({ frequency: 200, envelope: { attack: 0.001, decay: 0.1, release: 0.01 }, harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5 });
-                           type = 'hihat';
-                           break;
-                        default: // Clap, Toms, Perc, etc.
-                           synth = new Tone.PluckSynth({ attackNoise: 0.5, dampening: 4000, resonance: 0.7 });
-                           type = 'generic';
-                           break;
+                        case 0: synth = new Tone.MembraneSynth({ pitchDecay: 0.05, octaves: 10, oscillator: { type: "sine" }, envelope: { attack: 0.001, decay: 0.4, sustain: 0.01, release: 1.4, attackCurve: "exponential" } }); type = 'kick'; break;
+                        case 1: synth = new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.005, decay: 0.2, sustain: 0 } }); type = 'snare'; break;
+                        case 3: synth = new Tone.MetalSynth({ frequency: 200, envelope: { attack: 0.001, decay: 0.1, release: 0.01 }, harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5 }); type = 'hihat'; break;
+                        default: synth = new Tone.PluckSynth({ attackNoise: 0.5, dampening: 4000, resonance: 0.7 }); type = 'generic'; break;
                     }
-                    connectToFx(synth, fxChain);
+                    synth.connect(fxChain.reverbSend);
+                    synth.connect(fxChain.delaySend);
+                    synth.connect(fxChain.panVol);
                     instruments[i] = { name: trackNames[i], synth, fx: fxChain, player: null, source: synth, type };
                 }
             }
@@ -285,9 +273,7 @@
                     for (let s = 0; s < NUM_STEPS; s++) {
                         sequenceData[t][s] = { on: false, velocity: 1, ratchet: 1 };
                         const e = document.createElement('div');
-                        e.className = 'step';
-                        e.dataset.track = t;
-                        e.dataset.step = s;
+                        e.className = 'step'; e.dataset.track = t; e.dataset.step = s;
                         allElements.sequencerGrid.appendChild(e);
                     }
                 }
@@ -296,7 +282,7 @@
             function setupEventListeners() {
                 allElements.playStopBtn.addEventListener('click', togglePlayback);
                 allElements.bpmSlider.addEventListener('input', (e) => { Tone.Transport.bpm.value = e.target.value; allElements.bpmValue.textContent = e.target.value; });
-                allElements.sequencerGrid.addEventListener('click', handleStepClick);
+                allElements.sequencerGrid.addEventListener('click', handleGridClick);
                 allElements.sequencerGrid.addEventListener('dblclick', handleGridDblClick);
                 allElements.mutateBtn.addEventListener('click', mutateSequence);
                 allElements.midiInputDevice.addEventListener('change', (e) => activeMIDIInputId = e.target.value);
@@ -308,6 +294,7 @@
                 allElements.beatRepeatBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopBeatRepeat(); });
                 allElements.recordBtn.addEventListener('click', toggleRecord);
                 allElements.clearBtn.addEventListener('click', () => { clearSequence(); redrawGridFromData(); });
+                allElements.midiToggleBtn.addEventListener('click', () => { allElements.bottomControls.classList.toggle('hidden'); });
                 allElements.trackPopup.querySelector('#close-popup').addEventListener('click', closeTrackPopup);
                 allElements.stepPopup.querySelector('#close-step-popup').addEventListener('click', closeStepPopup);
                 setupPopupControls();
@@ -328,12 +315,10 @@
                         const { source, type } = instruments[track];
                         const note = getNoteForTrack(track);
                         const ratchet = parseInt(stepData.ratchet);
-                        
                         if (source instanceof Tone.Player) {
                             source.start(time, 0, undefined, triggerVelocity);
                             continue;
                         }
-
                         if (ratchet > 1) {
                             const noteDuration = Tone.Time('16n').toSeconds() / ratchet;
                             for (let i = 0; i < ratchet; i++) {
@@ -354,7 +339,7 @@
                 else if (e.target.classList.contains('step')) { openStepPopup(parseInt(e.target.dataset.track), parseInt(e.target.dataset.step)); }
             }
             
-            function handleStepClick(e) {
+            function handleGridClick(e) {
                 const target = e.target;
                 if (target.classList.contains('step')) { toggleStep(parseInt(target.dataset.track), parseInt(target.dataset.step)); } 
                 else if (target.classList.contains('settings-btn')) { openTrackPopup(parseInt(target.dataset.track)); }
@@ -463,7 +448,6 @@
             }
             
             function togglePlayback() { if ("started" === Tone.Transport.state) { Tone.Transport.stop(); allElements.playStopBtn.textContent = 'Play'; currentStep = 0; updateActiveStepUI(-1); } else { Tone.Transport.start(); allElements.playStopBtn.textContent = 'Stop'; } }
-            
             function toggleStep(t, s) {
                 const e = sequenceData[t][s];
                 e.on = !e.on;
@@ -471,7 +455,6 @@
                 stepEl.classList.toggle('on', e.on);
                 stepEl.classList.toggle('ratchet-on', e.ratchet > 1 && e.on);
             }
-            
             async function loadSample(trackIndex, file) {
                 if (!file) return;
                 const url = URL.createObjectURL(file);
@@ -496,7 +479,6 @@
                 const header = document.querySelector(`.track-header[data-track='${trackIndex}'] .track-name`);
                 if(header) header.classList.add('text-blue-400');
             }
-
             function mutateSequence() { for (let t = 0; t < NUM_TRACKS; t++) for (let s = 0; s < NUM_STEPS; s++) if (Math.random() < .25) toggleStep(t, s); }
             
             function clearSequence() {
