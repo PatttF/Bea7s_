@@ -137,18 +137,19 @@
     
     <div class="top-controls-wrapper">
         <h1 class="logo">Bea<span>7</span>s_</h1>
-        <!-- CHANGE: Added flex-wrap for responsiveness -->
         <div class="flex flex-wrap sm:flex-nowrap items-center justify-between gap-4 max-w-7xl mx-auto">
              <div class="flex items-center gap-2 w-full sm:w-auto">
-                <button id="play-stop" class="font-bold py-2 px-4 rounded-lg">Play</button>
-                <div class="flex items-center gap-2 flex-grow">
+                <button id="play-stop" class="font-bold py-2 px-4 rounded-lg w-1/2 sm:w-auto">Play</button>
+                <button id="record-btn" class="font-bold py-2 px-4 rounded-lg w-1/2 sm:w-auto">Record</button>
+            </div>
+             <div class="flex items-center gap-2 w-full sm:w-auto">
+                 <div class="flex items-center gap-2 flex-grow">
                     <label for="bpm" class="text-sm font-medium">BPM</label>
                     <input type="range" id="bpm" min="40" max="240" value="120" class="w-full">
                     <span id="bpm-value" class="font-mono w-12 text-center text-sm">120</span>
                 </div>
-            </div>
+             </div>
              <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
-                <button id="record-btn" class="font-bold p-2 rounded-lg text-xs">Rec</button>
                 <button id="clear-btn" class="font-bold p-2 rounded-lg text-xs">Clr</button>
                 <button id="mutate" class="font-bold p-2 rounded-lg text-xs">Mut</button>
                 <button id="beat-repeat-btn" class="font-bold py-2 px-3 rounded-lg text-xs">Repeat</button>
@@ -230,7 +231,7 @@
             allElements.loadingOverlay.addEventListener('click', initialize, { once: true });
             
             function createPopupHTML() {
-                 allElements.trackPopup.innerHTML = `<div class="popup"><h2 id="popup-track-name" class="text-2xl font-bold mb-4"></h2><div id="custom-synth-controls-container" class="space-y-4 mb-4"></div> <hr class="my-4 border-gray-600"> <div class="space-y-4"><div><label>Volume</label><input type="range" id="volume" min="-40" max="6" value="0" step="1"></div><div><label>Pan</label><input type="range" id="pan" min="-1" max="1" value="0" step="0.1"></div><div><label>Reverb</label><input type="range" id="reverb" min="0" max="1" value="0" step="0.01"></div><div><label>Delay</label><input type="range" id="delay" min="0" max="1" value="0" step="0.01"></div></div><button id="close-popup" class="mt-6 w-full text-lg">Close</button></div>`;
+                 allElements.trackPopup.innerHTML = `<div class="popup"><h2 id="popup-track-name" class="text-2xl font-bold mb-4"></h2><div id="custom-synth-controls-container" class="space-y-4 mb-4"></div> <hr class="my-4 border-gray-600"> <div class="space-y-4"><div><label>Volume</label><input type="range" id="volume" min="-40" max="6" value="0" step="1"></div><div><label>Pan</label><input type="range" id="pan" min="-1" max="1" value="0" step="0.1"></div><div><label>Reverb</label><input type="range" id="reverb" min="0" max="1" value="0" step="0.01"></div><div><label>Delay</label><input type="range" id="delay" min="0" max="1" value="0" step="0.01"></div><div><label>Bitcrush</label><input type="range" id="bitcrusher" min="1" max="8" value="8" step="1"></div><div><label>Chorus</label><input type="range" id="chorus" min="0" max="1" value="0" step="0.01"></div></div><button id="close-popup" class="mt-6 w-full text-lg">Close</button></div>`;
                  allElements.stepPopup.innerHTML = `<div class="popup"><h2 class="text-2xl font-bold mb-4">Step Options</h2><div class="space-y-4"><div><label for="velocity">Velocity</label><input type="range" id="velocity" min="0.1" max="1" value="1" step="0.01"></div><div><label for="ratchet">Ratchet</label><select id="ratchet" class="w-full"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></div></div><button id="close-step-popup" class="mt-6 w-full text-lg">Close</button></div>`;
             }
 
@@ -238,15 +239,14 @@
                 const globalReverb = new Tone.Reverb(1.5).toDestination();
                 const globalDelay = new Tone.FeedbackDelay("8n", 0.5).toDestination();
 
-                const createFxChain = () => {
+                for(let i=0; i < NUM_TRACKS; i++) {
                     const panVol = new Tone.PanVol(0, 0).toDestination();
                     const reverbSend = new Tone.Gain(0).connect(globalReverb);
                     const delaySend = new Tone.Gain(0).connect(globalDelay);
-                    return { panVol, reverbSend, delaySend };
-                };
-                
-                for(let i=0; i < NUM_TRACKS; i++) {
-                    const fxChain = createFxChain();
+                    const bitCrusher = new Tone.BitCrusher(8);
+                    const chorus = new Tone.Chorus(4, 2.5, 0.5).start();
+                    chorus.wet.value = 0;
+
                     let synth, type;
                     switch(i) {
                         case 0: synth = new Tone.MembraneSynth({ pitchDecay: 0.05, octaves: 10, oscillator: { type: "sine" }, envelope: { attack: 0.001, decay: 0.4, sustain: 0.01, release: 1.4, attackCurve: "exponential" } }); type = 'kick'; break;
@@ -254,10 +254,14 @@
                         case 3: synth = new Tone.MetalSynth({ frequency: 200, envelope: { attack: 0.001, decay: 0.1, release: 0.01 }, harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5 }); type = 'hihat'; break;
                         default: synth = new Tone.PluckSynth({ attackNoise: 0.5, dampening: 4000, resonance: 0.7 }); type = 'generic'; break;
                     }
-                    synth.connect(fxChain.reverbSend);
-                    synth.connect(fxChain.delaySend);
-                    synth.connect(fxChain.panVol);
-                    instruments[i] = { name: trackNames[i], synth, fx: fxChain, player: null, source: synth, type };
+                    
+                    // FIX: Correct audio routing chain
+                    synth.chain(bitCrusher, chorus, panVol);
+                    // Create parallel sends from the chorus output
+                    chorus.connect(reverbSend);
+                    chorus.connect(delaySend);
+                    
+                    instruments[i] = { name: trackNames[i], synth, fx: { panVol, reverbSend, delaySend, bitCrusher, chorus }, player: null, source: synth, type };
                 }
             }
             
@@ -335,8 +339,9 @@
             }
             
             function handleGridDblClick(e) {
-                if (e.target.classList.contains('track-name')) { renameTrack(e.target); } 
-                else if (e.target.classList.contains('step')) { openStepPopup(parseInt(e.target.dataset.track), parseInt(e.target.dataset.step)); }
+                const target = e.target;
+                if (target.classList.contains('track-name')) { renameTrack(target); } 
+                else if (target.classList.contains('step')) { openStepPopup(parseInt(target.dataset.track), parseInt(target.dataset.step)); }
             }
             
             function handleGridClick(e) {
@@ -462,12 +467,13 @@
 
                 if (instrument.player) instrument.player.dispose();
                 if (instrument.synth) {
+                    instrument.synth.disconnect();
                     instrument.synth.dispose();
                     instrument.synth = null;
                 }
 
                 const player = new Tone.Player(url);
-                await Tone.loaded(); 
+                await Tone.loaded();
                 
                 player.connect(instrument.fx.panVol);
                 player.connect(instrument.fx.reverbSend);
@@ -532,6 +538,8 @@
                 popup.querySelector("#pan").value = instrument.fx.panVol.pan.value;
                 popup.querySelector("#reverb").value = instrument.fx.reverbSend.gain.value;
                 popup.querySelector("#delay").value = instrument.fx.delaySend.gain.value;
+                popup.querySelector("#bitcrusher").value = instrument.fx.bitCrusher.bits.value;
+                popup.querySelector("#chorus").value = instrument.fx.chorus.wet.value;
                 popup.classList.remove("hidden");
             }
             
@@ -549,6 +557,8 @@
                     else if (e.target.id === 'pan') instrument.fx.panVol.pan.value = value;
                     else if (e.target.id === 'reverb') instrument.fx.reverbSend.gain.value = value;
                     else if (e.target.id === 'delay') instrument.fx.delaySend.gain.value = value;
+                    else if (e.target.id === 'bitcrusher') instrument.fx.bitCrusher.bits.value = value;
+                    else if (e.target.id === 'chorus') instrument.fx.chorus.wet.value = value;
                     else if(param && !(instrument.source instanceof Tone.Player)) {
                        if (param.includes('decay') || param.includes('attack') || param.includes('sustain') || param.includes('release')) {
                            instrument.synth.set({ envelope: { [param]: value } });
