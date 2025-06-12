@@ -6,6 +6,7 @@
     <title>Bea7s_</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tonejs/midi@2.0.28/build/Midi.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -94,7 +95,7 @@
             border-radius: 4px; padding: 0.5rem; color: var(--text-color);
             transition: all 0.2s ease-in-out;
         }
-        button:hover, label[for="load-input"]:hover {
+        button:hover, label[for="load-input"]:hover, label[for="midi-file-input"]:hover {
             border-color: var(--primary-color);
             color: white;
         }
@@ -108,26 +109,42 @@
              border-color: var(--record-armed-color);
         }
         .logo {
-            font-size: 2rem;
             font-weight: 700;
             color: var(--text-color);
             text-align: center;
-            margin-bottom: 0.5rem;
         }
         .logo span {
             color: var(--primary-color);
         }
+        .micro-step-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 4px;
+        }
+        .micro-step {
+            width: 100%;
+            padding-top: 100%;
+            background-color: var(--step-off-color);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.1s ease;
+        }
+        .micro-step.on {
+            background-color: var(--secondary-color);
+        }
     </style>
 </head>
 <body>
+    <input type="file" id="midi-file-input" class="hidden" accept=".mid,.midi">
 
     <div id="loading-overlay" class="fixed inset-0 bg-slate-900 flex flex-col justify-center items-center z-[100] text-center p-4">
-        <h1 class="logo">Bea<span>7</span>s_</h1>
+        <h1 class="logo text-3xl">Bea<span>7</span>s_</h1>
         <div class="mt-8 text-left max-w-md mx-auto space-y-2">
             <h2 class="text-xl font-bold text-center mb-4">How To Use</h2>
             <p><strong class="text-blue-400">Play/Stop:</strong> Use the main Play button.</p>
             <p><strong class="text-blue-400">Toggle Step:</strong> Click a step in the grid to turn it on/off.</p>
-            <p><strong class="text-blue-400">Step Options:</strong> Double-click a step for Velocity/Ratchet(Synth engine only for now).</p>
+            <p><strong class="text-blue-400">Save/Load:</strong> Use Save/Load buttons to handle MIDI files.</p>
+            <p><strong class="text-blue-400">Step Options:</strong> Double-click a step for Velocity, Ratchet & Probability.</p>
             <p><strong class="text-blue-400">Track FX:</strong> Click the 'FX' button on a track for sound design.</p>
             <p><strong class="text-blue-400">Rename Track:</strong> Double-click a track name to rename it.</p>
             <p><strong class="text-blue-400">MIDI Record:</strong> Arm 'Record', then play notes on your controller.</p>
@@ -136,26 +153,27 @@
     </div>
     
     <div class="top-controls-wrapper">
-        <h1 class="logo">Bea<span>7</span>s_</h1>
-        <!-- CHANGE: Restructured for responsiveness -->
-        <div class="flex flex-col sm:flex-row items-center justify-between gap-4 max-w-7xl mx-auto">
-             <div class="flex items-center gap-2 w-full sm:w-auto">
-                <button id="play-stop" class="font-bold py-2 px-4 rounded-lg w-1/2 sm:w-auto">Play</button>
-                <button id="record-btn" class="font-bold py-2 px-4 rounded-lg w-1/2 sm:w-auto">Record</button>
+        <div class="flex flex-col gap-3 max-w-7xl mx-auto">
+            <div class="flex justify-center">
+                <h1 class="logo text-2xl">Bea<span>7</span>s_</h1>
             </div>
-             <div class="flex items-center gap-2 w-full sm:w-auto">
-                 <div class="flex items-center gap-2 flex-grow">
-                    <label for="bpm" class="text-sm font-medium">BPM</label>
-                    <input type="range" id="bpm" min="40" max="240" value="120" class="w-full">
-                    <span id="bpm-value" class="font-mono w-12 text-center text-sm">120</span>
-                </div>
-             </div>
-             <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+            <div class="flex items-center justify-center gap-2">
+                <button id="play-stop" class="font-bold py-2 px-4 rounded-lg flex-grow">Play</button>
+                <button id="record-btn" class="font-bold p-2 rounded-lg text-xs flex-grow">Record</button>
+                <button id="save-midi-btn" class="font-bold p-2 rounded-lg text-xs flex-grow">Save</button>
+                <button id="load-midi-btn" class="font-bold p-2 rounded-lg text-xs flex-grow">Load</button>
+            </div>
+            <div class="flex items-center gap-2">
+                <label for="bpm" class="text-sm font-medium">BPM</label>
+                <input type="range" id="bpm" min="40" max="240" value="120" class="w-full">
+                <span id="bpm-value" class="font-mono w-12 text-center text-sm">120</span>
+            </div>
+            <div class="flex items-center justify-center flex-wrap gap-2">
                 <button id="clear-btn" class="font-bold p-2 rounded-lg text-xs">Clear</button>
                 <button id="mutate" class="font-bold p-2 rounded-lg text-xs">Mutate</button>
-                <button id="beat-repeat-btn" class="font-bold py-2 px-3 rounded-lg text-xs">Beat Repeat</button>
+                <button id="beat-repeat-btn" class="font-bold p-2 rounded-lg text-xs">Repeat</button>
                 <button id="midi-toggle-btn" class="font-bold p-2 rounded-lg text-xs">MIDI</button>
-             </div>
+            </div>
         </div>
     </div>
 
@@ -166,11 +184,9 @@
     </div>
     
     <div id="bottom-controls" class="bottom-controls hidden">
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-7xl mx-auto">
-             <div class="md:col-start-2 control-group flex flex-col"><label class="text-xs" for="midi-input-device">MIDI In Device</label><select id="midi-input-device" class="w-full text-sm"></select></div>
+        <div class="grid grid-cols-2 gap-4 max-w-md mx-auto">
+             <div class="control-group flex flex-col"><label class="text-xs" for="midi-input-device">MIDI In Device</label><select id="midi-input-device" class="w-full text-sm"></select></div>
              <div class="control-group flex flex-col"><label class="text-xs" for="midi-input-channel">MIDI In Ch</label><select id="midi-input-channel" class="w-full text-sm"></select></div>
-             <div class="control-group flex flex-col"><label class="text-xs" for="midi-output-device">MIDI Out Device</label><select id="midi-output-device" class="w-full text-sm"></select></div>
-             <div class="control-group flex flex-col"><label class="text-xs" for="midi-output-channel">MIDI Out Ch</label><select id="midi-output-channel" class="w-full text-sm"></select></div>
         </div>
     </div>
 
@@ -181,17 +197,20 @@
         document.addEventListener('DOMContentLoaded', () => {
             const NUM_STEPS = 16;
             const NUM_TRACKS = 12;
-            let trackNames = ['Kick', 'Snare', 'Clap', 'Hi-Hat', 'Tom 1', 'Tom 2', 'Cymbal', 'Perc', 'Conga', 'Cowbell', 'Clave', 'Maraca'];
+            let trackNames = ['Kick', 'Snare', 'Clap', 'Hi-Hat', 'Low Tom', 'High Tom', 'Crash', 'Side Stick', 'Low Conga', 'Cowbell', 'Claves', 'Maracas'];
             
-            const noteMap = { 35: 0, 36: 0, 38: 1, 40: 1, 39: 2, 42: 3, 44: 3, 46: 3, 41: 4, 43: 4, 45: 4, 47: 5, 48: 5, 50: 5, 49: 6, 51: 6, 52: 6, 55: 6, 57: 6, 59: 6, 56: 7, 63: 8, 64: 8, 56: 9, 75: 10, 70: 11 };
-            const trackNotes = [36, 38, 39, 42, 45, 48, 49, 56, 64, 56, 75, 70];
+            const trackNotes = [36, 38, 39, 42, 45, 50, 49, 37, 64, 56, 75, 70];
+            const noteMap = {
+                35: 0, 36: 0, 38: 1, 40: 1, 39: 2, 42: 3, 44: 3, 46: 3, 41: 4, 43: 4, 45: 4, 47: 4,
+                48: 5, 50: 5, 49: 6, 51: 6, 52: 6, 53: 6, 55: 6, 57: 6, 59: 6, 37: 7, 62: 8, 63: 8, 
+                64: 8, 56: 9, 75: 10, 70: 11, 82: 11
+            };
 
             let sequenceData = [];
             let instruments = [];
             let currentStep = 0;
             let midiAccess = null;
             let activeMIDIInputId = null;
-            let activeMIDIOutputId = null;
             let beatRepeatActive = false;
             let repeatEventId = null;
             let activePopupTrack = -1;
@@ -211,41 +230,23 @@
                 midiToggleBtn: document.getElementById('midi-toggle-btn'),
                 bottomControls: document.getElementById('bottom-controls'),
                 midiInputDevice: document.getElementById('midi-input-device'),
-                midiOutputDevice: document.getElementById('midi-output-device'),
                 midiInputChannel: document.getElementById('midi-input-channel'),
-                midiOutputChannel: document.getElementById('midi-output-channel'),
                 trackPopup: document.getElementById('track-popup'),
-                stepPopup: document.getElementById('step-popup')
+                stepPopup: document.getElementById('step-popup'),
+                saveMidiBtn: document.getElementById('save-midi-btn'),
+                loadMidiBtn: document.getElementById('load-midi-btn'),
+                midiFileInput: document.getElementById('midi-file-input'),
             };
 
-            async function initialize() {
-                await Tone.start();
-                createPopupHTML();
-                setupInstruments();
-                createSequencerGrid();
-                setupEventListeners();
-                await setupMIDI();
-                Tone.Transport.bpm.value = 120;
-                Tone.Transport.scheduleRepeat(onStep, '16n');
-                allElements.loadingOverlay.classList.add('hidden');
-            }
-            allElements.loadingOverlay.addEventListener('click', initialize, { once: true });
-            
             function createPopupHTML() {
                  allElements.trackPopup.innerHTML = `<div class="popup"><h2 id="popup-track-name" class="text-2xl font-bold mb-4"></h2><div id="custom-synth-controls-container" class="space-y-4 mb-4"></div> <hr class="my-4 border-gray-600"> <div class="space-y-4"><div><label>Volume</label><input type="range" id="volume" min="-40" max="6" value="0" step="1"></div><div><label>Pan</label><input type="range" id="pan" min="-1" max="1" value="0" step="0.1"></div><div><label>Reverb</label><input type="range" id="reverb" min="0" max="1" value="0" step="0.01"></div><div><label>Delay</label><input type="range" id="delay" min="0" max="1" value="0" step="0.01"></div></div><button id="close-popup" class="mt-6 w-full text-lg">Close</button></div>`;
-                 allElements.stepPopup.innerHTML = `<div class="popup"><h2 class="text-2xl font-bold mb-4">Step Options</h2><div class="space-y-4"><div><label for="velocity">Velocity</label><input type="range" id="velocity" min="0.1" max="1" value="1" step="0.01"></div><div><label for="ratchet">Ratchet</label><select id="ratchet" class="w-full"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></div></div><button id="close-step-popup" class="mt-6 w-full text-lg">Close</button></div>`;
+                 allElements.stepPopup.innerHTML = `<div class="popup"><h2 class="text-2xl font-bold mb-4">Step Options</h2><div class="space-y-4"><div><label for="velocity">Velocity</label><input type="range" id="velocity" min="0.1" max="1" value="1" step="0.01"></div><div class="space-y-2"><label>Ratchet</label><div id="ratchet-grid" class="micro-step-grid"></div></div><div class="space-y-2"><div class="flex justify-between items-center"><label for="probability">Probability</label><span id="probability-value" class="font-mono text-sm">100%</span></div><input type="range" id="probability" min="0" max="100" value="100" step="1"></div></div><button id="close-step-popup" class="mt-6 w-full text-lg">Close</button></div>`;
             }
 
             function setupInstruments() {
                 const globalReverb = new Tone.Reverb(1.5).toDestination();
                 const globalDelay = new Tone.FeedbackDelay("8n", 0.5).toDestination();
-
-                const createFxChain = () => {
-                    const panVol = new Tone.PanVol(0, 0).toDestination();
-                    const reverbSend = new Tone.Gain(0).connect(globalReverb);
-                    const delaySend = new Tone.Gain(0).connect(globalDelay);
-                    return { panVol, reverbSend, delaySend };
-                };
+                const createFxChain = () => ({ panVol: new Tone.PanVol(0, 0).toDestination(), reverbSend: new Tone.Gain(0).connect(globalReverb), delaySend: new Tone.Gain(0).connect(globalDelay) });
                 
                 for(let i=0; i < NUM_TRACKS; i++) {
                     const fxChain = createFxChain();
@@ -273,73 +274,44 @@
                     header.innerHTML = `<span data-track="${t}" class="track-name font-bold truncate cursor-pointer">${trackNames[t]}</span><div class="flex gap-1 mt-1"><button data-track="${t}" class="settings-btn text-xs p-1">FX</button><input type="file" id="track-${t}-loader" class="hidden" accept=".wav"><label for="track-${t}-loader" class="text-xs p-1 cursor-pointer">Load</label></div>`;
                     allElements.sequencerGrid.appendChild(header);
                     for (let s = 0; s < NUM_STEPS; s++) {
-                        sequenceData[t][s] = { on: false, velocity: 1, ratchet: 1 };
+                        sequenceData[t][s] = { on: false, velocity: 1, ratchet: [true, false, false, false], probability: 1 };
                         const e = document.createElement('div');
                         e.className = 'step'; e.dataset.track = t; e.dataset.step = s;
                         allElements.sequencerGrid.appendChild(e);
                     }
                 }
             }
-
-            function setupEventListeners() {
-                allElements.playStopBtn.addEventListener('click', togglePlayback);
-                allElements.bpmSlider.addEventListener('input', (e) => { Tone.Transport.bpm.value = e.target.value; allElements.bpmValue.textContent = e.target.value; });
-                allElements.sequencerGrid.addEventListener('click', handleGridClick);
-                allElements.sequencerGrid.addEventListener('dblclick', handleGridDblClick);
-                allElements.mutateBtn.addEventListener('click', mutateSequence);
-                allElements.midiInputDevice.addEventListener('change', (e) => activeMIDIInputId = e.target.value);
-                allElements.midiOutputDevice.addEventListener('change', (e) => activeMIDIOutputId = e.target.value);
-                allElements.beatRepeatBtn.addEventListener('mousedown', startBeatRepeat);
-                allElements.beatRepeatBtn.addEventListener('mouseup', stopBeatRepeat);
-                allElements.beatRepeatBtn.addEventListener('mouseleave', stopBeatRepeat);
-                allElements.beatRepeatBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startBeatRepeat(); });
-                allElements.beatRepeatBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopBeatRepeat(); });
-                allElements.recordBtn.addEventListener('click', toggleRecord);
-                allElements.clearBtn.addEventListener('click', () => { clearSequence(); redrawGridFromData(); });
-                allElements.midiToggleBtn.addEventListener('click', () => { allElements.bottomControls.classList.toggle('hidden'); });
-                allElements.trackPopup.querySelector('#close-popup').addEventListener('click', closeTrackPopup);
-                allElements.stepPopup.querySelector('#close-step-popup').addEventListener('click', closeStepPopup);
-                setupPopupControls();
-            }
-
-            function onStep(time) {
-                const stepToPlay = currentStep;
-                triggerStep(stepToPlay, time);
-                Tone.Draw.schedule(() => updateActiveStepUI(stepToPlay), time);
-                currentStep = (currentStep + 1) % NUM_STEPS;
-            }
-
+            
+            // CHANGE: Updated triggerStep to handle ratcheting for samples
             function triggerStep(step, time, velocityFromMIDI = null) {
+                if (step === -1) return; 
+
                 for (let track = 0; track < NUM_TRACKS; track++) {
                     const stepData = sequenceData[track][step];
-                    const triggerVelocity = velocityFromMIDI !== null ? velocityFromMIDI : stepData.velocity;
-                    if (stepData.on || velocityFromMIDI !== null) {
+                    if (stepData.on && (velocityFromMIDI !== null || Math.random() < stepData.probability)) {
+                        const triggerVelocity = velocityFromMIDI !== null ? velocityFromMIDI : stepData.velocity;
                         const { source, type } = instruments[track];
                         const note = getNoteForTrack(track);
-                        const ratchet = parseInt(stepData.ratchet);
-                        if (source instanceof Tone.Player) {
-                            source.start(time, 0, undefined, triggerVelocity);
-                            continue;
-                        }
-                        if (ratchet > 1) {
-                            const noteDuration = Tone.Time('16n').toSeconds() / ratchet;
-                            for (let i = 0; i < ratchet; i++) {
-                                const ratchetTime = time + i * noteDuration;
-                                if (type === 'snare') source.triggerAttack(ratchetTime, triggerVelocity);
-                                else source.triggerAttackRelease(note, noteDuration, ratchetTime, triggerVelocity);
+                        const microStepDuration = Tone.Time('16n').toSeconds() / 4;
+
+                        stepData.ratchet.forEach((isOn, index) => {
+                            if (isOn) {
+                                const ratchetTime = time + index * microStepDuration;
+                                if (source instanceof Tone.Player) {
+                                    source.start(ratchetTime, 0, undefined, triggerVelocity);
+                                } else {
+                                    if (type === 'snare') source.triggerAttack(ratchetTime, triggerVelocity);
+                                    else source.triggerAttackRelease(note, microStepDuration * 0.9, ratchetTime, triggerVelocity);
+                                }
                             }
-                        } else {
-                            if (type === 'snare') source.triggerAttack(time, triggerVelocity);
-                            else source.triggerAttackRelease(note, '16n', time, triggerVelocity);
-                        }
+                        });
                     }
                 }
             }
             
             function handleGridDblClick(e) {
-                const target = e.target;
-                if (target.classList.contains('track-name')) { renameTrack(target); } 
-                else if (target.classList.contains('step')) { openStepPopup(parseInt(target.dataset.track), parseInt(target.dataset.step)); }
+                if (e.target.classList.contains('track-name')) { renameTrack(e.target); } 
+                else if (e.target.classList.contains('step')) { openStepPopup(parseInt(e.target.dataset.track), parseInt(e.target.dataset.step)); }
             }
             
             function handleGridClick(e) {
@@ -414,17 +386,13 @@
                     allElements.midiInputDevice.add(o);
                     i.onmidimessage = onMIDIMessage;
                 });
-                allElements.midiOutputDevice.innerHTML = '<option value="">None</option>';
-                midiAccess.outputs.forEach(o => allElements.midiOutputDevice.add(new Option(o.name, o.id, false, o.id === activeMIDIOutputId)));
+                
                 if (allElements.midiInputChannel.options.length <= 1) {
                     allElements.midiInputChannel.innerHTML = '<option value="0">All</option>';
-                    allElements.midiOutputChannel.innerHTML = '<option value="0">All</option>';
                     for (let i = 1; i <= 16; i++) {
                         allElements.midiInputChannel.add(new Option(i, i));
-                        allElements.midiOutputChannel.add(new Option(i, i));
                     }
                     allElements.midiInputChannel.value = "10";
-                    allElements.midiOutputChannel.value = "10";
                 }
             }
             
@@ -435,29 +403,41 @@
                 const cmd = command >> 4;
                 const selectedChannel = parseInt(allElements.midiInputChannel.value);
                 if (selectedChannel !== 0 && channel !== selectedChannel) return;
-                const track = noteMap[note];
-                if (track === undefined) return;
+                const trackIndex = noteMap[note];
+                if (trackIndex === undefined) return;
 
                 if (cmd === 9 && velocity > 0) {
                     const toneVelocity = velocity / 127;
                     if (recordArmed && Tone.Transport.state === 'started') {
                         const ticksPerStep = Tone.Transport.PPQ / 4;
                         const recordStep = Math.floor(Tone.Transport.ticks / ticksPerStep) % NUM_STEPS;
-                        sequenceData[track][recordStep] = { ...sequenceData[track][recordStep], on: true, velocity: toneVelocity };
+                        const stepData = sequenceData[trackIndex][recordStep];
+                        stepData.on = true;
+                        stepData.velocity = toneVelocity;
+                        stepData.ratchet = [true, false, false, false];
+                        stepData.probability = 1;
                         redrawGridFromData();
                     }
-                    triggerStep(track, Tone.now(), toneVelocity);
+                    const { source, type } = instruments[trackIndex];
+                    const noteName = getNoteForTrack(trackIndex);
+                    if (source instanceof Tone.Player) {
+                        source.start(Tone.now(), 0, undefined, toneVelocity);
+                    } else {
+                        if (type === 'snare') source.triggerAttack(Tone.now(), toneVelocity);
+                        else source.triggerAttackRelease(noteName, '16n', Tone.now(), toneVelocity);
+                    }
                 }
             }
             
             function togglePlayback() { if ("started" === Tone.Transport.state) { Tone.Transport.stop(); allElements.playStopBtn.textContent = 'Play'; currentStep = 0; updateActiveStepUI(-1); } else { Tone.Transport.start(); allElements.playStopBtn.textContent = 'Stop'; } }
+            
             function toggleStep(t, s) {
-                const e = sequenceData[t][s];
-                e.on = !e.on;
-                const stepEl = document.querySelector(`.step[data-track='${t}'][data-step='${s}']`);
-                stepEl.classList.toggle('on', e.on);
-                stepEl.classList.toggle('ratchet-on', e.ratchet > 1 && e.on);
+                const stepData = sequenceData[t][s];
+                stepData.on = !stepData.on;
+                redrawGridFromData();
             }
+            
+            // CHANGE: Added .retrigger = true to enable sample ratcheting
             async function loadSample(trackIndex, file) {
                 if (!file) return;
                 const url = URL.createObjectURL(file);
@@ -468,9 +448,9 @@
                     instrument.synth.dispose();
                     instrument.synth = null;
                 }
-
                 const player = new Tone.Player(url);
-                await Tone.loaded();
+                player.retrigger = true; // This allows for rapid re-triggering (ratchets)
+                await Tone.loaded(); 
                 
                 player.connect(instrument.fx.panVol);
                 player.connect(instrument.fx.reverbSend);
@@ -479,28 +459,115 @@
                 instrument.player = player;
                 instrument.source = player;
                 
-                const header = document.querySelector(`.track-header[data-track='${trackIndex}'] .track-name`);
-                if(header) header.classList.add('text-blue-400');
+                document.querySelector(`.track-header[data-track='${trackIndex}'] .track-name`)?.classList.add('text-blue-400');
             }
-
+            
             function mutateSequence() { for (let t = 0; t < NUM_TRACKS; t++) for (let s = 0; s < NUM_STEPS; s++) if (Math.random() < .25) toggleStep(t, s); }
             
             function clearSequence() {
                  for (let t = 0; t < NUM_TRACKS; t++) for (let s = 0; s < NUM_STEPS; s++) {
-                    sequenceData[t][s].on = false; sequenceData[t][s].velocity = 1; sequenceData[t][s].ratchet = 1;
+                    sequenceData[t][s] = { on: false, velocity: 1, ratchet: [true, false, false, false], probability: 1 };
                 }
+                redrawGridFromData();
             }
 
             function redrawGridFromData() {
                  for (let t = 0; t < NUM_TRACKS; t++) for (let s = 0; s < NUM_STEPS; s++) {
                     const stepEl = allElements.sequencerGrid.querySelector(`.step[data-track='${t}'][data-step='${s}']`);
+                    const stepData = sequenceData[t][s];
                     if (stepEl) {
-                       stepEl.classList.toggle('on', sequenceData[t][s].on);
-                       stepEl.classList.toggle('ratchet-on', sequenceData[t][s].ratchet > 1 && sequenceData[t][s].on);
+                       stepEl.classList.toggle('on', stepData.on);
+                       const activeMicroSteps = stepData.ratchet.filter(Boolean).length;
+                       stepEl.classList.toggle('ratchet-on', activeMicroSteps > 1 && stepData.on);
                     }
                 }
             }
+            
+            function saveMIDI() {
+                const midi = new Midi();
+                midi.header.setTempo(Tone.Transport.bpm.value);
+                const track = midi.addTrack();
+                track.channel = 9; 
+                track.name = "Bea7s_ Drums";
 
+                for (let step = 0; step < NUM_STEPS; step++) {
+                    for (let trackIndex = 0; trackIndex < NUM_TRACKS; trackIndex++) {
+                        const stepData = sequenceData[trackIndex][step];
+                        if (stepData.on) {
+                             const microStepDuration = Tone.Time('16n').toSeconds() / 4;
+                             stepData.ratchet.forEach((isOn, rIndex) => {
+                                 if (isOn) {
+                                     track.addNote({
+                                         midi: trackNotes[trackIndex],
+                                         time: (step * (microStepDuration*4)) + (rIndex * microStepDuration),
+                                         duration: microStepDuration,
+                                         velocity: stepData.velocity,
+                                     });
+                                 }
+                             });
+                        }
+                    }
+                }
+
+                const bytes = midi.toArray();
+                const blob = new Blob([bytes], { type: 'audio/midi' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `bea7s-pattern-${Date.now()}.mid`;
+                a.click();
+                URL.revokeObjectURL(url);
+            }
+            
+            function loadMIDI(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const midi = new Midi(event.target.result);
+                        clearSequence();
+
+                        if (midi.header.tempos.length > 0) {
+                            const newBpm = midi.header.tempos[0].bpm;
+                            allElements.bpmSlider.value = newBpm;
+                            allElements.bpmValue.textContent = newBpm;
+                            Tone.Transport.bpm.value = newBpm;
+                        }
+
+                        const stepDuration = Tone.Time('16n').toSeconds();
+
+                        midi.tracks.forEach(track => {
+                            if (track.channel === 9) {
+                                track.notes.forEach(note => {
+                                    const appTrackIndex = noteMap[note.midi];
+                                    if (appTrackIndex !== undefined) {
+                                        const stepIndex = Math.floor(note.time / stepDuration);
+                                        if (stepIndex >= 0 && stepIndex < NUM_STEPS) {
+                                            const stepData = sequenceData[appTrackIndex][stepIndex];
+                                            if (!stepData.on) { // First note for this step initializes it
+                                                stepData.on = true;
+                                                stepData.velocity = note.velocity;
+                                                stepData.probability = 1;
+                                                stepData.ratchet = [false, false, false, false];
+                                            }
+                                            const microStepIndex = Math.round((note.time % stepDuration) / (stepDuration / 4));
+                                            if(microStepIndex < 4) stepData.ratchet[microStepIndex] = true;
+                                        }
+                                    }
+                                });
+                            }
+                        });
+                        redrawGridFromData();
+                    } catch (err) {
+                        console.error("Error parsing MIDI file:", err);
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+                e.target.value = '';
+            }
+            
             function openTrackPopup(trackIndex) {
                 activePopupTrack = trackIndex;
                 const instrument = instruments[trackIndex];
@@ -540,8 +607,31 @@
             }
             
             function closeTrackPopup() { allElements.trackPopup.classList.add("hidden"); activePopupTrack = -1; }
-            function openStepPopup(t, s) { activeStepForPopup = { track: t, step: s }; const e = sequenceData[t][s]; allElements.stepPopup.querySelector("#velocity").value = e.velocity; allElements.stepPopup.querySelector("#ratchet").value = e.ratchet; allElements.stepPopup.classList.remove("hidden"); }
-            function closeStepPopup() { allElements.stepPopup.classList.add("hidden"); activeStepForPopup = { track: -1, step: -1 }; }
+            
+            function openStepPopup(t, s) {
+                activeStepForPopup = { track: t, step: s };
+                const stepData = sequenceData[t][s];
+                const popup = allElements.stepPopup;
+
+                popup.querySelector("#velocity").value = stepData.velocity;
+                popup.querySelector("#probability").value = stepData.probability * 100;
+                popup.querySelector("#probability-value").textContent = `${Math.round(stepData.probability * 100)}%`;
+
+                const ratchetGrid = popup.querySelector("#ratchet-grid");
+                ratchetGrid.innerHTML = '';
+                for (let i = 0; i < 4; i++) {
+                    const microStep = document.createElement('div');
+                    microStep.className = 'micro-step';
+                    microStep.dataset.index = i;
+                    if (stepData.ratchet[i]) {
+                        microStep.classList.add('on');
+                    }
+                    ratchetGrid.appendChild(microStep);
+                }
+                popup.classList.remove("hidden");
+            }
+            
+            function closeStepPopup() { allElements.stepPopup.classList.add("hidden"); activeStepForPopup = { track: -1, step: -1 }; redrawGridFromData(); }
             
             function setupPopupControls() {
                 allElements.trackPopup.addEventListener('input', e => {
@@ -563,16 +653,79 @@
                        }
                     }
                 });
+
                 allElements.stepPopup.addEventListener('input', e => {
                     const { track: t, step: s } = activeStepForPopup;
-                    if(t < 0) return;
-                    if(e.target.id === 'velocity') sequenceData[t][s].velocity = parseFloat(e.target.value);
-                    if(e.target.id === 'ratchet') {
-                        sequenceData[t][s].ratchet = parseInt(e.target.value);
-                        redrawGridFromData();
+                    if (t < 0) return;
+                    const stepData = sequenceData[t][s];
+                    
+                    if (e.target.id === 'velocity') {
+                        stepData.velocity = parseFloat(e.target.value);
+                    } else if (e.target.id === 'probability') {
+                        const probValue = parseInt(e.target.value, 10);
+                        stepData.probability = probValue / 100;
+                        allElements.stepPopup.querySelector("#probability-value").textContent = `${probValue}%`;
+                    }
+                });
+
+                allElements.stepPopup.addEventListener('click', e => {
+                    if(e.target.classList.contains('micro-step')) {
+                        const { track: t, step: s } = activeStepForPopup;
+                        if (t < 0) return;
+                        
+                        const index = parseInt(e.target.dataset.index, 10);
+                        const stepData = sequenceData[t][s];
+                        stepData.ratchet[index] = !stepData.ratchet[index];
+                        e.target.classList.toggle('on');
                     }
                 });
             }
+
+            function onStep(time) {
+                const stepToPlay = currentStep;
+                triggerStep(stepToPlay, time);
+                Tone.Draw.schedule(() => updateActiveStepUI(stepToPlay), time);
+                currentStep = (currentStep + 1) % NUM_STEPS;
+            }
+
+            function setupEventListeners() {
+                allElements.playStopBtn.addEventListener('click', togglePlayback);
+                allElements.bpmSlider.addEventListener('input', (e) => { Tone.Transport.bpm.value = e.target.value; allElements.bpmValue.textContent = e.target.value; });
+                allElements.sequencerGrid.addEventListener('click', handleGridClick);
+                allElements.sequencerGrid.addEventListener('dblclick', handleGridDblClick);
+                allElements.mutateBtn.addEventListener('click', mutateSequence);
+                allElements.midiInputDevice.addEventListener('change', (e) => activeMIDIInputId = e.target.value);
+                allElements.beatRepeatBtn.addEventListener('mousedown', startBeatRepeat);
+                allElements.beatRepeatBtn.addEventListener('mouseup', stopBeatRepeat);
+                allElements.beatRepeatBtn.addEventListener('mouseleave', stopBeatRepeat);
+                allElements.beatRepeatBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startBeatRepeat(); });
+                allElements.beatRepeatBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopBeatRepeat(); });
+                allElements.recordBtn.addEventListener('click', toggleRecord);
+                allElements.clearBtn.addEventListener('click', clearSequence);
+                allElements.midiToggleBtn.addEventListener('click', () => { allElements.bottomControls.classList.toggle('hidden'); });
+                allElements.trackPopup.querySelector('#close-popup').addEventListener('click', closeTrackPopup);
+                allElements.stepPopup.querySelector('#close-step-popup').addEventListener('click', closeStepPopup);
+                
+                allElements.saveMidiBtn.addEventListener('click', saveMIDI);
+                allElements.loadMidiBtn.addEventListener('click', () => allElements.midiFileInput.click());
+                allElements.midiFileInput.addEventListener('change', loadMIDI);
+
+                setupPopupControls();
+            }
+
+            async function initialize() {
+                await Tone.start();
+                createPopupHTML();
+                setupInstruments();
+                createSequencerGrid();
+                setupEventListeners();
+                await setupMIDI();
+                Tone.Transport.bpm.value = 120;
+                Tone.Transport.scheduleRepeat(onStep, '16n');
+                allElements.loadingOverlay.classList.add('hidden');
+            }
+            
+            allElements.loadingOverlay.addEventListener('click', initialize, { once: true });
         });
     </script>
 </body>
