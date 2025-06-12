@@ -91,7 +91,7 @@
             background-color: var(--bg-color); border: 1px solid var(--primary-color);
             border-radius: 8px; padding: 1.5rem; width: 90%; max-width: 500px;
         }
-        select, button, label {
+        select, button, label, input[type=text] {
             background-color: #4a5568; border: 1px solid #718096;
             border-radius: 4px; padding: 0.5rem; color: var(--text-color);
             transition: all 0.2s ease-in-out;
@@ -99,6 +99,10 @@
         button:hover, label[for="load-input"]:hover, label[for="midi-file-input"]:hover {
             border-color: var(--primary-color);
             color: white;
+        }
+        input[type=text]:focus {
+            outline: none;
+            border-color: var(--primary-color);
         }
         #play-stop {
              background-color: var(--primary-color);
@@ -198,6 +202,22 @@
 
     <div id="track-popup" class="popup-overlay hidden"></div>
     <div id="step-popup" class="popup-overlay hidden"></div>
+    
+    <!-- ADDED: Save Modal -->
+    <div id="save-modal" class="popup-overlay hidden">
+        <div class="popup">
+            <h2 class="text-2xl font-bold mb-4">Save MIDI File</h2>
+            <div class="space-y-2">
+                <label for="filename-input">Filename</label>
+                <input type="text" id="filename-input" class="w-full" placeholder="bea7s-pattern">
+            </div>
+            <div class="mt-6 flex gap-4">
+                <button id="cancel-save-btn" class="font-bold py-2 px-4 rounded-lg flex-grow">Cancel</button>
+                <button id="confirm-save-btn" class="font-bold py-2 px-4 rounded-lg flex-grow bg-blue-500">Save</button>
+            </div>
+        </div>
+    </div>
+
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
@@ -241,6 +261,10 @@
                 saveMidiBtn: document.getElementById('save-midi-btn'),
                 loadMidiBtn: document.getElementById('load-midi-btn'),
                 midiFileInput: document.getElementById('midi-file-input'),
+                saveModal: document.getElementById('save-modal'),
+                filenameInput: document.getElementById('filename-input'),
+                confirmSaveBtn: document.getElementById('confirm-save-btn'),
+                cancelSaveBtn: document.getElementById('cancel-save-btn'),
             };
 
             function createPopupHTML() {
@@ -506,7 +530,8 @@
                 }
             }
             
-            function saveMIDI() {
+            // CHANGE: Modified to accept filename
+            function saveMIDI(filename) {
                 const midi = new Midi();
                 midi.header.setTempo(Tone.Transport.bpm.value);
                 const track = midi.addTrack();
@@ -537,7 +562,7 @@
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `bea7s-pattern-${Date.now()}.mid`;
+                a.download = `${filename}.mid`;
                 a.click();
                 URL.revokeObjectURL(url);
             }
@@ -645,7 +670,6 @@
                     customControlsContainer.insertAdjacentHTML('beforeend', pitchControlHTML);
                     actionsContainer.innerHTML = `<button id="clear-sample-btn" data-track="${trackIndex}" class="font-bold py-2 px-4 rounded-lg flex-grow">Clear Sample</button>`;
                 } else if (instrument.synth) {
-                    // Custom Synth Controls
                     const currentSynthSettings = instrument.synth.get();
                     switch (instrument.type) {
                         case 'snare':
@@ -778,6 +802,15 @@
                 currentStep = (currentStep + 1) % NUM_STEPS;
             }
 
+            function openSaveModal() {
+                allElements.saveModal.classList.remove('hidden');
+                allElements.filenameInput.focus();
+            }
+
+            function closeSaveModal() {
+                allElements.saveModal.classList.add('hidden');
+            }
+
             function setupEventListeners() {
                 allElements.playStopBtn.addEventListener('click', togglePlayback);
                 allElements.bpmSlider.addEventListener('input', (e) => { Tone.Transport.bpm.value = e.target.value; allElements.bpmValue.textContent = e.target.value; });
@@ -795,9 +828,18 @@
                 allElements.midiToggleBtn.addEventListener('click', () => { allElements.bottomControls.classList.toggle('hidden'); });
                 allElements.stepPopup.querySelector('#close-step-popup').addEventListener('click', closeStepPopup);
                 
-                allElements.saveMidiBtn.addEventListener('click', saveMIDI);
+                // CHANGE: Save button now opens the modal
+                allElements.saveMidiBtn.addEventListener('click', openSaveModal);
                 allElements.loadMidiBtn.addEventListener('click', () => allElements.midiFileInput.click());
                 allElements.midiFileInput.addEventListener('change', loadMIDI);
+                
+                // CHANGE: Listeners for save modal buttons
+                allElements.confirmSaveBtn.addEventListener('click', () => {
+                    const filename = allElements.filenameInput.value || `bea7s-pattern-${Date.now()}`;
+                    saveMIDI(filename);
+                    closeSaveModal();
+                });
+                allElements.cancelSaveBtn.addEventListener('click', closeSaveModal);
 
                 setupPopupControls();
             }
