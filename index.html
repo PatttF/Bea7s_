@@ -23,6 +23,7 @@
             --step-active-color: #ffffff;
             --text-color: #edf2f7; /* Slate 200 */
             --record-armed-color: #e53e3e; /* Red 600 */
+            --danger-color: #e53e3e; /* Red 600 */
         }
         html, body {
             height: 100vh; width: 100vw; margin: 0; padding: 0;
@@ -108,6 +109,10 @@
              background-color: var(--record-armed-color);
              border-color: var(--record-armed-color);
         }
+        #clear-sample-btn {
+            background-color: var(--danger-color);
+            border-color: var(--danger-color);
+        }
         .logo {
             font-weight: 700;
             color: var(--text-color);
@@ -146,6 +151,7 @@
             <p><strong class="text-blue-400">Save/Load:</strong> Use Save/Load buttons to handle MIDI files.</p>
             <p><strong class="text-blue-400">Step Options:</strong> Double-click a step for Velocity, Ratchet & Probability.</p>
             <p><strong class="text-blue-400">Track FX:</strong> Click the 'FX' button on a track for sound design.</p>
+            <p><strong class="text-blue-400">Clear Sample:</strong> In the FX popup, clear a loaded sample.</p>
             <p><strong class="text-blue-400">Rename Track:</strong> Double-click a track name to rename it.</p>
             <p><strong class="text-blue-400">MIDI Record:</strong> Arm 'Record', then play notes on your controller.</p>
         </div>
@@ -238,25 +244,31 @@
                 midiFileInput: document.getElementById('midi-file-input'),
             };
 
+            // --- FUNCTION DEFINITIONS ---
+
             function createPopupHTML() {
-                 allElements.trackPopup.innerHTML = `<div class="popup"><h2 id="popup-track-name" class="text-2xl font-bold mb-4"></h2><div id="custom-synth-controls-container" class="space-y-4 mb-4"></div> <hr class="my-4 border-gray-600"> <div class="space-y-4"><div><label>Volume</label><input type="range" id="volume" min="-40" max="6" value="0" step="1"></div><div><label>Pan</label><input type="range" id="pan" min="-1" max="1" value="0" step="0.1"></div><div><label>Reverb</label><input type="range" id="reverb" min="0" max="1" value="0" step="0.01"></div><div><label>Delay</label><input type="range" id="delay" min="0" max="1" value="0" step="0.01"></div></div><button id="close-popup" class="mt-6 w-full text-lg">Close</button></div>`;
-                 allElements.stepPopup.innerHTML = `<div class="popup"><h2 class="text-2xl font-bold mb-4">Step Options</h2><div class="space-y-4"><div><label for="velocity">Velocity</label><input type="range" id="velocity" min="0.1" max="1" value="1" step="0.01"></div><div class="space-y-2"><label>Ratchet</label><div id="ratchet-grid" class="micro-step-grid"></div></div><div class="space-y-2"><div class="flex justify-between items-center"><label for="probability">Probability</label><span id="probability-value" class="font-mono text-sm">100%</span></div><input type="range" id="probability" min="0" max="100" value="100" step="1"></div></div><button id="close-step-popup" class="mt-6 w-full text-lg">Close</button></div>`;
+                 allElements.trackPopup.innerHTML = `<div class="popup"><h2 id="popup-track-name" class="text-2xl font-bold mb-4"></h2><div id="custom-synth-controls-container" class="space-y-4 mb-4"></div> <hr class="my-4 border-gray-600"> <div class="space-y-4"><div><label>Volume</label><input type="range" id="volume" min="-40" max="6" value="0" step="1"></div><div><label>Pan</label><input type="range" id="pan" min="-1" max="1" value="0" step="0.1"></div><div><label>Reverb</label><input type="range" id="reverb" min="0" max="1" value="0" step="0.01"></div><div><label>Delay</label><input type="range" id="delay" min="0" max="1" value="0" step="0.01"></div></div><div id="popup-actions" class="mt-6 flex gap-4"></div></div>`;
+                 allElements.stepPopup.innerHTML = `<div class="popup"><h2 class="text-2xl font-bold mb-4">Step Options</h2><div class="space-y-4"><div><label for="velocity">Velocity</label><input type="range" id="velocity" min="0.1" max="1" value="1" step="0.01"></div><div class="space-y-2"><label>Ratchet</label><div class="w-1/2"><div id="ratchet-grid" class="micro-step-grid"></div></div></div><div class="space-y-2"><div class="flex justify-between items-center"><label for="probability">Probability</label><span id="probability-value" class="font-mono text-sm">100%</span></div><input type="range" id="probability" min="0" max="100" value="100" step="1"></div></div><button id="close-step-popup" class="mt-6 w-full text-lg">Close</button></div>`;
+            }
+
+            function createDefaultSynth(index) {
+                let synth, type;
+                switch(index) {
+                    case 0: synth = new Tone.MembraneSynth({ pitchDecay: 0.05, octaves: 10, oscillator: { type: "sine" }, envelope: { attack: 0.001, decay: 0.4, sustain: 0.01, release: 1.4, attackCurve: "exponential" } }); type = 'kick'; break;
+                    case 1: synth = new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.005, decay: 0.2, sustain: 0 } }); type = 'snare'; break;
+                    case 3: synth = new Tone.MetalSynth({ frequency: 200, envelope: { attack: 0.001, decay: 0.1, release: 0.01 }, harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5 }); type = 'hihat'; break;
+                    default: synth = new Tone.PluckSynth({ attackNoise: 0.5, dampening: 4000, resonance: 0.7 }); type = 'generic'; break;
+                }
+                return { synth, type };
             }
 
             function setupInstruments() {
                 const globalReverb = new Tone.Reverb(1.5).toDestination();
                 const globalDelay = new Tone.FeedbackDelay("8n", 0.5).toDestination();
-                const createFxChain = () => ({ panVol: new Tone.PanVol(0, 0).toDestination(), reverbSend: new Tone.Gain(0).connect(globalReverb), delaySend: new Tone.Gain(0).connect(globalDelay) });
                 
                 for(let i=0; i < NUM_TRACKS; i++) {
-                    const fxChain = createFxChain();
-                    let synth, type;
-                    switch(i) {
-                        case 0: synth = new Tone.MembraneSynth({ pitchDecay: 0.05, octaves: 10, oscillator: { type: "sine" }, envelope: { attack: 0.001, decay: 0.4, sustain: 0.01, release: 1.4, attackCurve: "exponential" } }); type = 'kick'; break;
-                        case 1: synth = new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.005, decay: 0.2, sustain: 0 } }); type = 'snare'; break;
-                        case 3: synth = new Tone.MetalSynth({ frequency: 200, envelope: { attack: 0.001, decay: 0.1, release: 0.01 }, harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5 }); type = 'hihat'; break;
-                        default: synth = new Tone.PluckSynth({ attackNoise: 0.5, dampening: 4000, resonance: 0.7 }); type = 'generic'; break;
-                    }
+                    const fxChain = { panVol: new Tone.PanVol(0, 0).toDestination(), reverbSend: new Tone.Gain(0).connect(globalReverb), delaySend: new Tone.Gain(0).connect(globalDelay) };
+                    const { synth, type } = createDefaultSynth(i);
                     synth.connect(fxChain.reverbSend);
                     synth.connect(fxChain.delaySend);
                     synth.connect(fxChain.panVol);
@@ -282,7 +294,6 @@
                 }
             }
             
-            // CHANGE: Updated triggerStep to handle ratcheting for samples
             function triggerStep(step, time, velocityFromMIDI = null) {
                 if (step === -1) return; 
 
@@ -437,7 +448,6 @@
                 redrawGridFromData();
             }
             
-            // CHANGE: Added .retrigger = true to enable sample ratcheting
             async function loadSample(trackIndex, file) {
                 if (!file) return;
                 const url = URL.createObjectURL(file);
@@ -449,7 +459,7 @@
                     instrument.synth = null;
                 }
                 const player = new Tone.Player(url);
-                player.retrigger = true; // This allows for rapid re-triggering (ratchets)
+                player.retrigger = true;
                 await Tone.loaded(); 
                 
                 player.connect(instrument.fx.panVol);
@@ -546,7 +556,7 @@
                                         const stepIndex = Math.floor(note.time / stepDuration);
                                         if (stepIndex >= 0 && stepIndex < NUM_STEPS) {
                                             const stepData = sequenceData[appTrackIndex][stepIndex];
-                                            if (!stepData.on) { // First note for this step initializes it
+                                            if (!stepData.on) {
                                                 stepData.on = true;
                                                 stepData.velocity = note.velocity;
                                                 stepData.probability = 1;
@@ -568,6 +578,32 @@
                 e.target.value = '';
             }
             
+            // CHANGE: Added function to clear a sample and restore the default synth
+            function clearSample(trackIndex) {
+                const instrument = instruments[trackIndex];
+                if (instrument.player) {
+                    instrument.player.dispose();
+                    instrument.player = null;
+                }
+
+                const { synth, type } = createDefaultSynth(trackIndex);
+                const fxChain = instrument.fx;
+                synth.connect(fxChain.reverbSend);
+                synth.connect(fxChain.delaySend);
+                synth.connect(fxChain.panVol);
+
+                instrument.synth = synth;
+                instrument.source = synth;
+                instrument.type = type;
+
+                document.querySelector(`.track-header[data-track='${trackIndex}'] .track-name`)?.classList.remove('text-blue-400');
+                
+                // Refresh the popup if it's currently open for this track
+                if (activePopupTrack === trackIndex) {
+                    openTrackPopup(trackIndex);
+                }
+            }
+            
             function openTrackPopup(trackIndex) {
                 activePopupTrack = trackIndex;
                 const instrument = instruments[trackIndex];
@@ -576,11 +612,16 @@
                 const popup = allElements.trackPopup;
                 popup.querySelector("#popup-track-name").textContent = `Track: ${trackNames[trackIndex]}`;
                 const customControlsContainer = popup.querySelector("#custom-synth-controls-container");
+                const actionsContainer = popup.querySelector("#popup-actions");
                 customControlsContainer.innerHTML = '';
+                actionsContainer.innerHTML = ''; // Clear previous buttons
+
                 let controlsHTML = '';
                 
-                if(instrument.source instanceof Tone.Player){
+                if(instrument.player){
                     controlsHTML = `<p class='text-gray-400'>Sample loaded. Synth controls disabled.</p>`;
+                    // Add Clear Sample button if a player exists
+                    actionsContainer.innerHTML = `<button id="clear-sample-btn" data-track="${trackIndex}" class="font-bold py-2 px-4 rounded-lg flex-grow">Clear Sample</button>`;
                 } else {
                     const currentSynthSettings = instrument.synth.get();
                     switch (instrument.type) {
@@ -599,6 +640,10 @@
                     }
                 }
                 customControlsContainer.innerHTML = controlsHTML;
+                
+                // Always show the close button
+                actionsContainer.innerHTML += `<button id="close-popup" class="font-bold py-2 px-4 rounded-lg flex-grow">Close</button>`;
+
                 popup.querySelector("#volume").value = instrument.fx.panVol.volume.value;
                 popup.querySelector("#pan").value = instrument.fx.panVol.pan.value;
                 popup.querySelector("#reverb").value = instrument.fx.reverbSend.gain.value;
@@ -654,6 +699,15 @@
                     }
                 });
 
+                allElements.trackPopup.addEventListener('click', e => {
+                    if (e.target.id === 'close-popup') {
+                        closeTrackPopup();
+                    } else if (e.target.id === 'clear-sample-btn') {
+                        const trackIndex = parseInt(e.target.dataset.track);
+                        clearSample(trackIndex);
+                    }
+                });
+
                 allElements.stepPopup.addEventListener('input', e => {
                     const { track: t, step: s } = activeStepForPopup;
                     if (t < 0) return;
@@ -703,7 +757,6 @@
                 allElements.recordBtn.addEventListener('click', toggleRecord);
                 allElements.clearBtn.addEventListener('click', clearSequence);
                 allElements.midiToggleBtn.addEventListener('click', () => { allElements.bottomControls.classList.toggle('hidden'); });
-                allElements.trackPopup.querySelector('#close-popup').addEventListener('click', closeTrackPopup);
                 allElements.stepPopup.querySelector('#close-step-popup').addEventListener('click', closeStepPopup);
                 
                 allElements.saveMidiBtn.addEventListener('click', saveMIDI);
