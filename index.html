@@ -59,7 +59,6 @@
         }
         .sequencer-grid {
             display: grid;
-            /* CHANGE: Increased the minimum and max width of the first column */
             grid-template-columns: minmax(85px, 1.5fr) repeat(16, minmax(0, 3fr));
             gap: 4px; padding: 4px;
         }
@@ -204,13 +203,12 @@
         document.addEventListener('DOMContentLoaded', () => {
             const NUM_STEPS = 16;
             const NUM_TRACKS = 12;
-            let trackNames = ['Kick', 'Snare', 'Clap', 'Hi-Hat', 'Low Tom', 'High Tom', 'Crash', 'Side Stick', 'Low Conga', 'Cowbell', 'Claves', 'Maracas'];
+            let trackNames = ['Kick', 'Snare', 'Clap', 'Closed Hat', 'Open Hat', 'Low Tom', 'Mid Tom', 'High Tom', 'Crash', 'Cowbell', 'Claves', 'Maracas'];
             
-            const trackNotes = [36, 38, 39, 42, 45, 50, 49, 37, 64, 56, 75, 70];
+            const trackNotes = [36, 38, 39, 42, 46, 45, 48, 50, 49, 56, 75, 70];
             const noteMap = {
-                35: 0, 36: 0, 38: 1, 40: 1, 39: 2, 42: 3, 44: 3, 46: 3, 41: 4, 43: 4, 45: 4, 47: 4,
-                48: 5, 50: 5, 49: 6, 51: 6, 52: 6, 53: 6, 55: 6, 57: 6, 59: 6, 37: 7, 62: 8, 63: 8, 
-                64: 8, 56: 9, 75: 10, 70: 11, 82: 11
+                35: 0, 36: 0, 38: 1, 40: 1, 39: 2, 42: 3, 44: 3, 46: 4, 41: 5, 43: 5, 45: 5, 47: 6, 48: 6, 50: 7,
+                49: 8, 52: 8, 55: 8, 57: 8, 56: 9, 75: 10, 70: 11
             };
 
             let sequenceData = [];
@@ -246,17 +244,57 @@
             };
 
             function createPopupHTML() {
-                 allElements.trackPopup.innerHTML = `<div class="popup"><h2 id="popup-track-name" class="text-2xl font-bold mb-4"></h2><div id="custom-synth-controls-container" class="space-y-4 mb-4"></div> <hr class="my-4 border-gray-600"> <div id="generic-controls-container" class="space-y-4"><div><label>Volume</label><input type="range" id="volume" min="-40" max="6" value="0" step="1"></div><div><label>Pan</label><input type="range" id="pan" min="-1" max="1" value="0" step="0.1"></div><div><label>Reverb</label><input type="range" id="reverb" min="0" max="1" value="0" step="0.01"></div><div><label>Delay</label><input type="range" id="delay" min="0" max="1" value="0" step="0.01"></div><div><label>Attack</label><input type="range" id="attack" min="0" max="1" value="0.01" step="0.01"></div><div><label>Release</label><input type="range" id="release" min="0.01" max="2" value="0.1" step="0.01"></div></div><div id="popup-actions" class="mt-6 flex gap-4"></div></div>`;
+                 allElements.trackPopup.innerHTML = `<div class="popup"><h2 id="popup-track-name" class="text-2xl font-bold mb-4"></h2><div id="custom-synth-controls-container" class="space-y-4 mb-4"></div> <hr class="my-4 border-gray-600"> <div id="generic-controls-container" class="space-y-4"><div><label>Volume</label><input type="range" id="volume" min="-40" max="6" value="0" step="1"></div><div><label>Pan</label><input type="range" id="pan" min="-1" max="1" value="0" step="0.1"></div><div><label>Reverb</label><input type="range" id="reverb" min="0" max="1" value="0" step="0.01"></div><div><label>Delay</label><input type="range" id="delay" min="0" max="1" value="0" step="0.01"></div><div><label>Attack</label><input type="range" id="attack" min="0" max="1" value="0" step="0.01"></div><div><label>Release</label><input type="range" id="release" min="0.01" max="2" value="0.1" step="0.01"></div></div><div id="popup-actions" class="mt-6 flex gap-4"></div></div>`;
                  allElements.stepPopup.innerHTML = `<div class="popup"><h2 class="text-2xl font-bold mb-4">Step Options</h2><div class="space-y-4"><div><label for="velocity">Velocity</label><input type="range" id="velocity" min="0.1" max="1" value="1" step="0.01"></div><div class="space-y-2"><label>Ratchet</label><div class="w-1/2"><div id="ratchet-grid" class="micro-step-grid"></div></div></div><div class="space-y-2"><div class="flex justify-between items-center"><label for="probability">Probability</label><span id="probability-value" class="font-mono text-sm">100%</span></div><input type="range" id="probability" min="0" max="100" value="100" step="1"></div></div><button id="close-step-popup" class="mt-6 w-full text-lg">Close</button></div>`;
             }
 
+            // FIXED: Replaced Tone.SnareDrum with a tuned NoiseSynth
             function createDefaultSynth(index) {
                 let synth, type, attack, release;
                 switch(index) {
-                    case 0: attack = 0.001; release = 0.5; synth = new Tone.MembraneSynth({ pitchDecay: 0.05, octaves: 10, oscillator: { type: "sine" }, envelope: { attack, decay: 0.4, sustain: 0.01, release } }); type = 'kick'; break;
-                    case 1: attack = 0.005; release = 0.2; synth = new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack, decay: 0.1, sustain: 0, release } }); type = 'snare'; break;
-                    case 3: attack = 0.001; release = 0.1; synth = new Tone.MetalSynth({ frequency: 200, envelope: { attack, decay: 0.1, release }, harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5 }); type = 'hihat'; break;
-                    default: attack = 0.001; release = 0.7; synth = new Tone.PluckSynth({ attackNoise: 0.5, dampening: 4000, resonance: 0.7, release }); type = 'generic'; break;
+                    case 0: // Kick
+                        attack = 0.002; release = 0.4;
+                        synth = new Tone.MembraneSynth({ pitchDecay: 0.04, octaves: 6, oscillator: { type: "sine" }, envelope: { attack, decay: 0.8, sustain: 0.01, release } });
+                        type = 'kick'; break;
+                    case 1: // Snare
+                        attack = 0.001; release = 0.2;
+                        synth = new Tone.NoiseSynth({
+                            noise: { type: 'white' },
+                            envelope: { attack: 0.005, decay: 0.2, sustain: 0 }
+                        });
+                        type = 'snare'; break;
+                    case 2: // Clap
+                        attack = 0.001; release = 0.1;
+                        synth = new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack, decay: 0.1, sustain: 0, release: 0.1 }, });
+                        type = 'clap'; break;
+                    case 3: // Closed Hat
+                        attack = 0.001; release = 0.15;
+                        synth = new Tone.MetalSynth({ frequency: 400, envelope: { attack, decay: 0.05, release }, harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5 });
+                        type = 'hihat'; break;
+                    case 4: // Open Hat
+                        attack = 0.001; release = 0.5;
+                        synth = new Tone.MetalSynth({ frequency: 250, envelope: { attack, decay: 0.08, release }, harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5 });
+                        type = 'hihat'; break;
+                    case 5: // Low Tom
+                        attack = 0.01; release = 0.4;
+                        synth = new Tone.MembraneSynth({ pitchDecay: 0.08, octaves: 4, oscillator: { type: "sine" }, envelope: { attack, decay: 0.3, sustain: 0.01, release } });
+                        type = 'tom'; break;
+                    case 6: // Mid Tom
+                         attack = 0.01; release = 0.4;
+                        synth = new Tone.MembraneSynth({ pitchDecay: 0.06, octaves: 5, oscillator: { type: "sine" }, envelope: { attack, decay: 0.3, sustain: 0.01, release } });
+                        type = 'tom'; break;
+                    case 7: // High Tom
+                         attack = 0.01; release = 0.4;
+                        synth = new Tone.MembraneSynth({ pitchDecay: 0.04, octaves: 6, oscillator: { type: "sine" }, envelope: { attack, decay: 0.2, sustain: 0.01, release } });
+                        type = 'tom'; break;
+                    case 8: // Crash
+                        attack = 0.01; release = 1.5;
+                        synth = new Tone.MetalSynth({ frequency: 200, envelope: { attack, decay: 1, release }, harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 3 });
+                        type = 'cymbal'; break;
+                    default: // Generic Perc for Cowbell, Claves, Maracas
+                        attack = 0.001; release = 0.2;
+                        synth = new Tone.PluckSynth({ attackNoise: 1, dampening: 4000, resonance: 0.9, release });
+                        type = 'generic_perc'; break;
                 }
                 return { synth, type, attack, release };
             }
@@ -293,6 +331,7 @@
                 }
             }
             
+            // FIXED: Corrected trigger logic for clap to ensure release
             function triggerStep(step, time, velocityFromMIDI = null) {
                 if (step === -1) return; 
 
@@ -309,9 +348,10 @@
                                 const ratchetTime = time + index * microStepDuration;
                                 if (source instanceof Tone.Player) {
                                     source.start(ratchetTime, 0, undefined, triggerVelocity);
+                                } else if (type === 'snare' || type === 'clap') {
+                                    source.triggerAttack(ratchetTime, triggerVelocity);
                                 } else {
-                                    if (type === 'snare') source.triggerAttack(ratchetTime, triggerVelocity);
-                                    else source.triggerAttackRelease(note, microStepDuration * 0.9, ratchetTime, triggerVelocity);
+                                    source.triggerAttackRelease(note, microStepDuration * 0.9, ratchetTime, triggerVelocity);
                                 }
                             }
                         });
@@ -432,9 +472,11 @@
                     const noteName = getNoteForTrack(trackIndex);
                     if (source instanceof Tone.Player) {
                         source.start(Tone.now(), 0, undefined, toneVelocity);
-                    } else {
-                        if (type === 'snare') source.triggerAttack(Tone.now(), toneVelocity);
-                        else source.triggerAttackRelease(noteName, '16n', Tone.now(), toneVelocity);
+                    } else if (type === 'snare' || type === 'clap') {
+                        source.triggerAttack(Tone.now(), toneVelocity);
+                    }
+                    else {
+                        source.triggerAttackRelease(noteName, '16n', Tone.now(), toneVelocity);
                     }
                 }
             }
@@ -458,7 +500,8 @@
                     instrument.synth = null;
                 }
                 
-                instrument.attack = 0.01;
+                // FIXED: Set sample attack to 0
+                instrument.attack = 0; 
                 instrument.release = 1;
                 instrument.playbackRate = 1;
 
@@ -637,24 +680,10 @@
                     const pitchControlHTML = `<div id="pitch-control"><label>Pitch</label><input type="range" id="pitch" min="0.25" max="4" value="${instrument.playbackRate}" step="0.01"></div>`;
                     customControlsContainer.insertAdjacentHTML('beforeend', pitchControlHTML);
                     actionsContainer.innerHTML = `<button id="clear-sample-btn" data-track="${trackIndex}" class="font-bold py-2 px-4 rounded-lg flex-grow">Clear Sample</button>`;
-                } else {
-                    const currentSynthSettings = instrument.synth.get();
-                    switch (instrument.type) {
-                        case 'kick':
-                            controlsHTML = `<div><label>Pitch Decay</label><input type="range" data-param="pitchDecay" min="0.01" max="0.5" value="${currentSynthSettings.pitchDecay}" step="0.01"></div><div><label>Octaves</label><input type="range" data-param="octaves" min="1" max="10" value="${currentSynthSettings.octaves}" step="0.5"></div><div><label>Decay</label><input type="range" data-param="decay" min="0.01" max="1.4" value="${currentSynthSettings.envelope.decay}" step="0.01"></div>`;
-                            break;
-                        case 'snare':
-                            controlsHTML = `<div><label>Decay</label><input type="range" data-param="decay" min="0.01" max="0.5" value="${currentSynthSettings.envelope.decay}" step="0.01"></div>`;
-                            break;
-                        case 'hihat':
-                            controlsHTML = `<div><label>Metallic</label><input type="range" data-param="harmonicity" min="1" max="10" value="${currentSynthSettings.harmonicity}" step="0.1"></div><div><label>Resonance</label><input type="range" data-param="resonance" min="1000" max="8000" value="${currentSynthSettings.resonance}" step="100"></div>`;
-                            break;
-                        default:
-                            controlsHTML = `<div><label>Dampening</label><input type="range" data-param="dampening" min="1000" max="7000" value="${currentSynthSettings.dampening}" step="100"></div><div><label>Resonance</label><input type="range" data-param="resonance" min="0" max="0.99" value="${currentSynthSettings.resonance}" step="0.01"></div>`;
-                            break;
-                    }
+                } else if (instrument.synth) {
+                   // No custom synth controls needed for the new synths yet
                 }
-                customControlsContainer.innerHTML = controlsHTML;
+                
                 actionsContainer.innerHTML += `<button id="close-popup" class="font-bold py-2 px-4 rounded-lg flex-grow">Close</button>`;
 
                 popup.querySelector("#volume").value = instrument.fx.panVol.volume.value;
@@ -718,7 +747,7 @@
                         instrument.playbackRate = value;
                         if (instrument.player) instrument.player.playbackRate.value = value;
                     }
-                    else if(param && !(instrument.source instanceof Tone.Player)) {
+                    else if(param && !(instrument.source instanceof Tone.Player) && instrument.synth) {
                        if (param.includes('decay') || param.includes('attack') || param.includes('sustain') || param.includes('release')) {
                            instrument.synth.set({ envelope: { [param]: value } });
                        } else if (instrument.synth[param] && typeof instrument.synth[param].value !== 'undefined') {
