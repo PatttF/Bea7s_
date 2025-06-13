@@ -151,10 +151,10 @@
         <div class="mt-8 text-left max-w-md mx-auto space-y-2">
             <h2 class="text-xl font-bold text-center mb-4">How To Use</h2>
             <p><strong class="text-blue-400">Play/Stop:</strong> Use the main Play button.</p>
-            <p><strong class="text-blue-400">Toggle Step:</strong> Click a step in the grid to turn it on/off.</p>
+            <p><strong class="text-blue-400">Toggle Step:</strong> Click or drag on the grid to add/remove notes.</p>
             <p><strong class="text-blue-400">Save/Load:</strong> Use Save/Load buttons to handle MIDI files.</p>
             <p><strong class="text-blue-400">Step Options:</strong> Double-click a step for Velocity, Ratchet & Probability.</p>
-            <p><strong class="text-blue-400">Track FX:</strong> Click the 'FX' button for Pitch, Attack, Release, and other effects.</p>
+            <p><strong class="text-blue-400">Track FX:</strong> Click the 'Opt' button for Pitch, Attack, Release, and other effects. Release controls Choke falloff. </p>
             <p><strong class="text-blue-400">Clear Sample:</strong> In the FX popup, clear a loaded sample.</p>
             <p><strong class="text-blue-400">Rename Track:</strong> Double-click a track name to rename it.</p>
             <p><strong class="text-blue-400">MIDI Record:</strong> Arm 'Record', then play notes on your controller.</p>
@@ -203,7 +203,6 @@
     <div id="track-popup" class="popup-overlay hidden"></div>
     <div id="step-popup" class="popup-overlay hidden"></div>
     
-    <!-- ADDED: Save Modal -->
     <div id="save-modal" class="popup-overlay hidden">
         <div class="popup">
             <h2 class="text-2xl font-bold mb-4">Save MIDI File</h2>
@@ -241,6 +240,8 @@
             let activePopupTrack = -1;
             let activeStepForPopup = { track: -1, step: -1 };
             let recordArmed = false;
+            let isDrawing = false;
+            let drawMode = null; 
 
             const allElements = {
                 loadingOverlay: document.getElementById('loading-overlay'),
@@ -268,7 +269,7 @@
             };
 
             function createPopupHTML() {
-                 allElements.trackPopup.innerHTML = `<div class="popup"><h2 id="popup-track-name" class="text-2xl font-bold mb-4"></h2><div id="custom-synth-controls-container" class="space-y-4 mb-4"></div> <hr class="my-4 border-gray-600"> <div id="generic-controls-container" class="space-y-4"><div><label>Volume</label><input type="range" id="volume" min="-40" max="6" value="0" step="1"></div><div><label>Pan</label><input type="range" id="pan" min="-1" max="1" value="0" step="0.1"></div><div><label>Reverb</label><input type="range" id="reverb" min="0" max="1" value="0" step="0.01"></div><div><label>Delay</label><input type="range" id="delay" min="0" max="1" value="0" step="0.01"></div><div><label>Attack</label><input type="range" id="attack" min="0" max="1" value="0.01" step="0.01"></div><div><label>Release</label><input type="range" id="release" min="0.01" max="2" value="0.1" step="0.01"></div></div><div id="popup-actions" class="mt-6 flex gap-4"></div></div>`;
+                 allElements.trackPopup.innerHTML = `<div class="popup"><h2 id="popup-track-name" class="text-2xl font-bold mb-4"></h2><div id="custom-synth-controls-container" class="space-y-4 mb-4"></div> <hr class="my-4 border-gray-600"> <div id="generic-controls-container" class="space-y-4"><div><label>Volume</label><input type="range" id="volume" min="-40" max="6" value="0" step="1"></div><div><label>Pan</label><input type="range" id="pan" min="-1" max="1" value="0" step="0.1"></div><div><label>Reverb</label><input type="range" id="reverb" min="0" max="1" value="0" step="0.01"></div><div><label>Delay</label><input type="range" id="delay" min="0" max="1" value="0" step="0.01"></div><div><label>Attack</label><input type="range" id="attack" min="0" max="1" value="0" step="0.01"></div><div><label>Release</label><input type="range" id="release" min="0.01" max="2" value="0.1" step="0.01"></div><div id="choke-group-container"><label>Choke Group</label><select id="choke-group" class="w-full"></select></div></div><div id="popup-actions" class="mt-6 flex gap-4"></div></div>`;
                  allElements.stepPopup.innerHTML = `<div class="popup"><h2 class="text-2xl font-bold mb-4">Step Options</h2><div class="space-y-4"><div><label for="velocity">Velocity</label><input type="range" id="velocity" min="0.1" max="1" value="1" step="0.01"></div><div class="space-y-2"><label>Ratchet</label><div class="w-1/2"><div id="ratchet-grid" class="micro-step-grid"></div></div></div><div class="space-y-2"><div class="flex justify-between items-center"><label for="probability">Probability</label><span id="probability-value" class="font-mono text-sm">100%</span></div><input type="range" id="probability" min="0" max="100" value="100" step="1"></div></div><button id="close-step-popup" class="mt-6 w-full text-lg">Close</button></div>`;
             }
 
@@ -278,7 +279,7 @@
                     case 0: attack = 0.002; release = 0.4; synth = new Tone.MembraneSynth({ pitchDecay: 0.04, octaves: 6, oscillator: { type: "sine" }, envelope: { attack, decay: 0.8, sustain: 0.01, release } }); type = 'kick'; break;
                     case 1: attack = 0.001; release = 0.2; synth = new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.005, decay: 0.2, sustain: 0, release: 0.1 }}); type = 'snare'; break;
                     case 2: attack = 0.001; release = 0.1; synth = new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack, decay: 0.1, sustain: 0, release: 0.1 } }); type = 'clap'; break;
-                    case 3: attack = 0.001; release = 0.15; synth = new Tone.MetalSynth({ frequency: 400, envelope: { attack, decay: 0.05, release }, harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5 }); type = 'hihat'; break;
+                    case 3: attack = 0.001; release = 0.05; synth = new Tone.MetalSynth({ frequency: 400, envelope: { attack, decay: 0.05, release }, harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5 }); type = 'hihat'; break;
                     case 4: attack = 0.001; release = 0.5; synth = new Tone.MetalSynth({ frequency: 250, envelope: { attack, decay: 0.08, release }, harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5 }); type = 'hihat'; break;
                     case 5: attack = 0.01; release = 0.4; synth = new Tone.MembraneSynth({ pitchDecay: 0.08, octaves: 4, oscillator: { type: "sine" }, envelope: { attack, decay: 0.3, sustain: 0.01, release } }); type = 'tom'; break;
                     case 6: attack = 0.01; release = 0.4; synth = new Tone.MembraneSynth({ pitchDecay: 0.06, octaves: 5, oscillator: { type: "sine" }, envelope: { attack, decay: 0.3, sustain: 0.01, release } }); type = 'tom'; break;
@@ -288,18 +289,25 @@
                 }
                 return { synth, type, attack, release };
             }
-
+            
             function setupInstruments() {
                 const globalReverb = new Tone.Reverb(1.5).toDestination();
                 const globalDelay = new Tone.FeedbackDelay("8n", 0.5).toDestination();
                 
                 for(let i=0; i < NUM_TRACKS; i++) {
-                    const fxChain = { panVol: new Tone.PanVol(0, 0).toDestination(), reverbSend: new Tone.Gain(0).connect(globalReverb), delaySend: new Tone.Gain(0).connect(globalDelay) };
+                    const panVol = new Tone.PanVol(0, 0).toDestination();
+                    const reverbSend = new Tone.Gain(0).connect(globalReverb);
+                    const delaySend = new Tone.Gain(0).connect(globalDelay);
+                   
+                    const fxChain = { panVol, reverbSend, delaySend };
+                    let chokeGroup = (i === 3 || i === 4) ? 1 : 0; 
+
                     const { synth, type, attack, release } = createDefaultSynth(i);
+                    synth.connect(fxChain.panVol);
                     synth.connect(fxChain.reverbSend);
                     synth.connect(fxChain.delaySend);
-                    synth.connect(fxChain.panVol);
-                    instruments[i] = { name: trackNames[i], synth, fx: fxChain, player: null, source: synth, type, attack, release, playbackRate: 1 };
+
+                    instruments[i] = { name: trackNames[i], synth, fx: fxChain, player: null, source: synth, type, attack, release, playbackRate: 1, chokeGroup };
                 }
             }
             
@@ -310,7 +318,7 @@
                     const header = document.createElement('div');
                     header.className = 'track-header flex flex-col items-center justify-center p-1 rounded text-center';
                     header.dataset.track = t;
-                    header.innerHTML = `<span data-track="${t}" class="track-name font-bold truncate cursor-pointer">${trackNames[t]}</span><div class="flex gap-1 mt-1"><button data-track="${t}" class="settings-btn text-xs p-1">FX</button><input type="file" id="track-${t}-loader" class="hidden" accept=".wav"><label for="track-${t}-loader" class="text-xs p-1 cursor-pointer">Load</label></div>`;
+                    header.innerHTML = `<span data-track="${t}" class="track-name font-bold truncate cursor-pointer">${trackNames[t]}</span><div class="flex gap-1 mt-1"><button data-track="${t}" class="settings-btn text-xs p-1">Opt</button><input type="file" id="track-${t}-loader" class="hidden" accept=".wav"><label for="track-${t}-loader" class="text-xs p-1 cursor-pointer">Load</label></div>`;
                     allElements.sequencerGrid.appendChild(header);
                     for (let s = 0; s < NUM_STEPS; s++) {
                         sequenceData[t][s] = { on: false, velocity: 1, ratchet: [true, false, false, false], probability: 1 };
@@ -328,7 +336,21 @@
                     const stepData = sequenceData[track][step];
                     if (stepData.on && (velocityFromMIDI !== null || Math.random() < stepData.probability)) {
                         const triggerVelocity = velocityFromMIDI !== null ? velocityFromMIDI : stepData.velocity;
-                        const { source, type } = instruments[track];
+                        const instrument = instruments[track];
+                        const { source, type, chokeGroup } = instrument;
+                        
+                        if (chokeGroup > 0) {
+                            instruments.forEach((otherInst, otherIdx) => {
+                                if (track !== otherIdx && otherInst.chokeGroup === chokeGroup && otherInst.source) {
+                                    if (otherInst.source instanceof Tone.Player) {
+                                        otherInst.source.stop(time);
+                                    } else {
+                                        otherInst.source.triggerRelease(time);
+                                    }
+                                }
+                            });
+                        }
+
                         const note = getNoteForTrack(track);
                         const microStepDuration = Tone.Time('16n').toSeconds() / 4;
 
@@ -338,7 +360,7 @@
                                 if (source instanceof Tone.Player) {
                                     source.start(ratchetTime, 0, undefined, triggerVelocity);
                                 } else if (type === 'snare' || type === 'clap') {
-                                    source.triggerAttack(ratchetTime, triggerVelocity);
+                                    source.triggerAttackRelease(instrument.release, ratchetTime, triggerVelocity);
                                 } else {
                                     source.triggerAttackRelease(note, microStepDuration * 0.9, ratchetTime, triggerVelocity);
                                 }
@@ -355,9 +377,9 @@
             
             function handleGridClick(e) {
                 const target = e.target;
-                if (target.classList.contains('step')) { toggleStep(parseInt(target.dataset.track), parseInt(target.dataset.step)); } 
-                else if (target.classList.contains('settings-btn')) { openTrackPopup(parseInt(target.dataset.track)); }
-                else if (target.tagName === 'LABEL' && target.htmlFor.includes('loader')) {
+                if (target.classList.contains('settings-btn')) { 
+                    openTrackPopup(parseInt(target.dataset.track)); 
+                } else if (target.tagName === 'LABEL' && target.htmlFor.includes('loader')) {
                     document.getElementById(target.htmlFor).addEventListener('change', (ev) => loadSample(parseInt(target.htmlFor.split('-')[1]), ev.target.files[0]), { once: true });
                 }
             }
@@ -457,12 +479,12 @@
                         stepData.probability = 1;
                         redrawGridFromData();
                     }
-                    const { source, type } = instruments[trackIndex];
+                    const { source, type, release } = instruments[trackIndex];
                     const noteName = getNoteForTrack(trackIndex);
                     if (source instanceof Tone.Player) {
                         source.start(Tone.now(), 0, undefined, toneVelocity);
                     } else if (type === 'snare' || type === 'clap') {
-                        source.triggerAttack(Tone.now(), toneVelocity);
+                        source.triggerAttackRelease(release, Tone.now(), toneVelocity);
                     }
                     else {
                         source.triggerAttackRelease(noteName, '16n', Tone.now(), toneVelocity);
@@ -493,15 +515,17 @@
                 instrument.release = 1;
                 instrument.playbackRate = 1;
 
-                const player = new Tone.Player(url).connect(instrument.fx.panVol);
+                const player = new Tone.Player(url);
                 player.retrigger = true;
                 player.fadeIn = instrument.attack;
                 player.fadeOut = instrument.release;
                 player.playbackRate.value = instrument.playbackRate;
-                await Tone.loaded(); 
                 
+                player.connect(instrument.fx.panVol);
                 player.connect(instrument.fx.reverbSend);
                 player.connect(instrument.fx.delaySend);
+
+                await Tone.loaded(); 
 
                 instrument.player = player;
                 instrument.source = player;
@@ -530,7 +554,6 @@
                 }
             }
             
-            // CHANGE: Modified to accept filename
             function saveMIDI(filename) {
                 const midi = new Midi();
                 midi.header.setTempo(Tone.Transport.bpm.value);
@@ -592,6 +615,7 @@
                                     const appTrackIndex = noteMap[note.midi];
                                     if (appTrackIndex !== undefined) {
                                         const stepIndex = Math.floor(note.time / stepDuration);
+                                        // FIXED: Corrected syntax error
                                         if (stepIndex >= 0 && stepIndex < NUM_STEPS) {
                                             const stepData = sequenceData[appTrackIndex][stepIndex];
                                             if (!stepData.on) {
@@ -632,9 +656,9 @@
                 
                 synth.set({ envelope: { attack: instrument.attack, release: instrument.release } });
 
+                synth.connect(fxChain.panVol);
                 synth.connect(fxChain.reverbSend);
                 synth.connect(fxChain.delaySend);
-                synth.connect(fxChain.panVol);
 
                 instrument.synth = synth;
                 instrument.source = synth;
@@ -662,6 +686,14 @@
                 
                 const existingPitchControl = genericControlsContainer.querySelector("#pitch-control");
                 if (existingPitchControl) existingPitchControl.remove();
+                
+                const chokeSelect = popup.querySelector("#choke-group");
+                chokeSelect.innerHTML = '<option value="0">None</option>';
+                for(let i=1; i<=12; i++) {
+                    chokeSelect.add(new Option(`Group ${i}`, i));
+                }
+                chokeSelect.value = instrument.chokeGroup;
+
 
                 let controlsHTML = '';
                 
@@ -673,7 +705,8 @@
                     const currentSynthSettings = instrument.synth.get();
                     switch (instrument.type) {
                         case 'snare':
-                            controlsHTML = `<div><label>Decay</label><input type="range" data-param="decay" min="0.01" max="1" value="${currentSynthSettings.envelope.decay}" step="0.01"></div>`;
+                        case 'clap':
+                            controlsHTML = `<div><label>Decay</label><input type="range" data-param="release" min="0.01" max="1" value="${instrument.release}" step="0.01"></div>`;
                              break;
                         case 'kick':
                         case 'tom':
@@ -695,7 +728,7 @@
                 popup.querySelector("#delay").value = instrument.fx.delaySend.gain.value;
                 popup.querySelector("#attack").value = instrument.attack;
                 popup.querySelector("#release").value = instrument.release;
-
+                
                 popup.classList.remove("hidden");
             }
             
@@ -726,6 +759,15 @@
             
             function closeStepPopup() { allElements.stepPopup.classList.add("hidden"); activeStepForPopup = { track: -1, step: -1 }; redrawGridFromData(); }
             
+            function openSaveModal() {
+                allElements.saveModal.classList.remove('hidden');
+                allElements.filenameInput.focus();
+            }
+
+            function closeSaveModal() {
+                allElements.saveModal.classList.add('hidden');
+            }
+            
             function setupPopupControls() {
                 allElements.trackPopup.addEventListener('input', e => {
                     if (activePopupTrack < 0) return;
@@ -749,6 +791,9 @@
                     else if (e.target.id === 'pitch') {
                         instrument.playbackRate = value;
                         if (instrument.player) instrument.player.playbackRate.value = value;
+                    }
+                    else if (e.target.id === 'choke-group') {
+                        instrument.chokeGroup = parseInt(e.target.value, 10);
                     }
                     else if(param && !(instrument.source instanceof Tone.Player) && instrument.synth) {
                        if (instrument.synth.get(param) !== undefined) {
@@ -802,18 +847,37 @@
                 currentStep = (currentStep + 1) % NUM_STEPS;
             }
 
-            function openSaveModal() {
-                allElements.saveModal.classList.remove('hidden');
-                allElements.filenameInput.focus();
-            }
-
-            function closeSaveModal() {
-                allElements.saveModal.classList.add('hidden');
-            }
-
             function setupEventListeners() {
                 allElements.playStopBtn.addEventListener('click', togglePlayback);
                 allElements.bpmSlider.addEventListener('input', (e) => { Tone.Transport.bpm.value = e.target.value; allElements.bpmValue.textContent = e.target.value; });
+                allElements.sequencerGrid.addEventListener('mousedown', (e) => {
+                    if (e.target.classList.contains('step')) {
+                        isDrawing = true;
+                        const stepData = sequenceData[e.target.dataset.track][e.target.dataset.step];
+                        drawMode = stepData.on ? 'remove' : 'add';
+                        toggleStep(parseInt(e.target.dataset.track), parseInt(e.target.dataset.step));
+                    }
+                });
+
+                allElements.sequencerGrid.addEventListener('mouseover', (e) => {
+                    if (isDrawing && e.target.classList.contains('step')) {
+                        const track = parseInt(e.target.dataset.track);
+                        const step = parseInt(e.target.dataset.step);
+                        const stepData = sequenceData[track][step];
+                        
+                        if (drawMode === 'add' && !stepData.on) {
+                            toggleStep(track, step);
+                        } else if (drawMode === 'remove' && stepData.on) {
+                            toggleStep(track, step);
+                        }
+                    }
+                });
+                
+                document.body.addEventListener('mouseup', () => {
+                    isDrawing = false;
+                    drawMode = null;
+                });
+                
                 allElements.sequencerGrid.addEventListener('click', handleGridClick);
                 allElements.sequencerGrid.addEventListener('dblclick', handleGridDblClick);
                 allElements.mutateBtn.addEventListener('click', mutateSequence);
@@ -828,12 +892,10 @@
                 allElements.midiToggleBtn.addEventListener('click', () => { allElements.bottomControls.classList.toggle('hidden'); });
                 allElements.stepPopup.querySelector('#close-step-popup').addEventListener('click', closeStepPopup);
                 
-                // CHANGE: Save button now opens the modal
                 allElements.saveMidiBtn.addEventListener('click', openSaveModal);
                 allElements.loadMidiBtn.addEventListener('click', () => allElements.midiFileInput.click());
                 allElements.midiFileInput.addEventListener('change', loadMIDI);
                 
-                // CHANGE: Listeners for save modal buttons
                 allElements.confirmSaveBtn.addEventListener('click', () => {
                     const filename = allElements.filenameInput.value || `bea7s-pattern-${Date.now()}`;
                     saveMIDI(filename);
@@ -845,12 +907,16 @@
             }
 
             async function initialize() {
-                await Tone.start();
+                // FIXED: Reordered initialization sequence
                 createPopupHTML();
                 setupInstruments();
                 createSequencerGrid();
                 setupEventListeners();
                 await setupMIDI();
+                
+                await Tone.start();
+                console.log("AudioContext started");
+                
                 Tone.Transport.bpm.value = 120;
                 Tone.Transport.scheduleRepeat(onStep, '16n');
                 allElements.loadingOverlay.classList.add('hidden');
